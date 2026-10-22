@@ -63,10 +63,11 @@ The provider is an in-process module (`src/server/provider/provider.ts`). Config
 | `PROVIDER_FAILURE_RATE` | `0.1` | Probability (0–1) that a provider call fails |
 | `PROVIDER_TIMEOUT_MS` | `1000` | How long the API waits for the provider before answering without live details |
 | `PROVIDER_SEED` | _(unset)_ | Integer seed for repeatable latency/failure sequences. Unset means `Math.random` |
+| `LIVE_DETAILS_CACHE_TTL_MS` | `30000` | How long a provider answer may be reused (see [Caching](#caching)). `0` disables the cache |
 
 With the defaults, most searches are fully enriched. About 10% hit a provider failure and about 10% exceed the 1 s wait. Invalid values stop the server at startup with a clear error.
 
-Demo recipes (macOS/Linux shells; in PowerShell use `$env:PROVIDER_FAILURE_RATE=1; npm run dev`):
+Demo recipes (macOS/Linux shells; in PowerShell use `$env:PROVIDER_FAILURE_RATE=1; npm run dev`). Add `LIVE_DETAILS_CACHE_TTL_MS=0` when you want every search to reach the provider, otherwise repeated searches are answered from the cache:
 
 ```bash
 PROVIDER_FAILURE_RATE=1 npm run dev                                    # always fails → degraded banner
@@ -77,13 +78,28 @@ PROVIDER_MIN_LATENCY_MS=1500 PROVIDER_MAX_LATENCY_MS=1500 PROVIDER_TIMEOUT_MS=40
 PROVIDER_SEED=42 npm run dev                                           # same sequence every restart
 ```
 
+## Caching
+
+Provider answers are cached on the server for `LIVE_DETAILS_CACHE_TTL_MS` (30 s by default):
+
+- **Freshness:** a cached price, availability or delivery estimate is never older than the TTL.
+- **What is cached:** well-formed provider answers, both `available` and `unavailable`, per item id.
+- **What is never cached:** failures, timeouts and malformed entries, so an outage isn't remembered after the provider recovers.
+- **Effect:** a repeated or overlapping search only asks the provider for items it doesn't have fresh answers for, and makes no provider call at all when everything is cached (`enrichment.durationMs` is `0`).
+- **Bounded:** at most 1000 entries, oldest evicted first. In-memory and per server instance.
+- **Partial results:** if the provider fails while some items were cached, those items keep their live details and the response says `partial` with the failure reason.
+
+`enrichment.cacheHits` in each search response, the `cache` section of `/api/metrics`, and the `cache` entry of the `Server-Timing` header show how well it is working.
+
+The client deliberately does **not** cache search responses: the server owns the freshness rule for live prices.
+
 ## Instrumentation: how to view it
 
 | Where | What you see |
 | --- | --- |
 | **API terminal** | One log line per search: query, result count, enrichment outcome, provider wait. Abandoned (client-aborted) searches are logged too. |
-| **`GET /api/metrics`** | Request counts per route and status (including `aborted`), latency avg/p50/p95/max over the last 500 requests per route, and enrichment outcomes by status and failure reason. Open <http://localhost:3000/api/metrics> in a browser (it pretty-prints JSON), or `curl -s localhost:3000/api/metrics`. In dev the same path works through Vite on :5173. |
-| **DevTools → Network → (search request) → Timing** | `Server-Timing` breakdown: `search` (catalog filter/sort) and `provider` (time spent waiting for live details). |
+| **`GET /api/metrics`** | Request counts per route and status (including `aborted`), latency avg/p50/p95/max over the last 500 requests per route, enrichment outcomes by status and failure reason, and cache hit rate. Open <http://localhost:3000/api/metrics> in a browser (it pretty-prints JSON), or `curl -s localhost:3000/api/metrics`. In dev the same path works through Vite on :5173. |
+| **DevTools → Network → (search request) → Timing** | `Server-Timing` breakdown: `search` (catalog filter/sort), `provider` (time spent waiting for live details) and `cache` (hits out of matches). |
 | **DevTools → Performance → Timings** | A `search` measure per completed search, end to end as the user experienced it. |
 | **DevTools console** (`npm run dev` only) | `[search] "pizza": 422ms total (search 0ms, provider 414ms)` |
 
@@ -105,7 +121,8 @@ Example `/api/metrics` (abridged):
                          "latencyMs": { "samples": 12, "avg": 480.1, "p50": 412.3, "p95": 1004.2, "max": 1010.9 } }
   },
   "enrichment": { "complete": 8, "partial": 0, "unavailable": { "timeout": 1, "provider_error": 1 }, "skipped": 1,
-                  "providerLatencyMs": { "samples": 10, "avg": 512.4, "p50": 498, "p95": 1001.2, "max": 1001.2 } }
+                  "providerLatencyMs": { "samples": 10, "avg": 512.4, "p50": 498, "p95": 1001.2, "max": 1001.2 } },
+  "cache": { "hits": 30, "misses": 66, "hitRate": 0.31 }
 }
 ```
 
@@ -161,7 +178,7 @@ curl "http://localhost:3000/api/search?q=chocolate&category=desserts&sort=popula
       "live": { "status": "available", "priceCents": 19890, "currency": "ZAR", "deliveryMinutes": { "min": 16, "max": 26 } }
     }
   ],
-  "enrichment": { "status": "complete", "durationMs": 642 }
+  "enrichment": { "status": "complete", "durationMs": 642, "cacheHits": 0 }
 }
 ```
 
@@ -177,10 +194,12 @@ curl "http://localhost:3000/api/search?q=chocolate&category=desserts&sort=popula
 
 | Status | When | HTTP |
 | --- | --- | --- |
-| `complete` | Provider answered for every item | 200 |
-| `partial` | Provider answered but omitted some items (those are `unknown/not_returned`) | 200 |
-| `unavailable` | Provider failed or timed out; catalog results are still returned, each `unknown`. `reason` is `timeout` or `provider_error` | 200 |
+| `complete` | Every item has live details (from the provider and/or the cache) | 200 |
+| `partial` | Some items have live details and some are `unknown`: the provider omitted them, or it failed (`reason` set) while other items came from the cache | 200 |
+| `unavailable` | No item has live details; catalog results are still returned, each `unknown`. `reason` is `timeout` or `provider_error` when the provider failed | 200 |
 | `skipped` | No matches, so the provider was not called | 200 |
+
+Other summary fields: `durationMs` (time waiting for the provider; `0` if not called) and `cacheHits` (items answered from the cache).
 
 Degraded example (provider failed):
 
@@ -189,7 +208,7 @@ Degraded example (provider failed):
   "query": { "q": "burger", "category": null, "sort": "popularity" },
   "total": 6,
   "items": [{ "id": "itm-001", "name": "Classic Smash Burger", "...": "...", "live": { "status": "unknown", "reason": "provider_error" } }],
-  "enrichment": { "status": "unavailable", "reason": "provider_error", "durationMs": 312 }
+  "enrichment": { "status": "unavailable", "reason": "provider_error", "durationMs": 312, "cacheHits": 0 }
 }
 ```
 
@@ -225,7 +244,8 @@ src/
     search/search.ts          pure search / filter / sort
     search/query.ts           query-string validation
     provider/                 simulated upstream provider + seedable PRNG
-    enrichment/enrich.ts      batch call, bounded wait, failure semantics
+    enrichment/enrich.ts      cache lookup, batch call, bounded wait, failure semantics
+    enrichment/liveDetailsCache.ts  TTL cache with explicit freshness policy
   client/
     App.svelte                state machine, latest-request guard, page layout
     components/               SearchForm, ResultsList, ResultCard, EnrichmentNotice

@@ -66,19 +66,22 @@ export interface SearchResultItem extends CatalogItem {
 }
 
 /**
- * - complete:    provider answered for every item.
- * - partial:     provider answered, but some items were missing.
- * - unavailable: provider failed or timed out; every item is `unknown`.
+ * - complete:    live details for every item (from the provider and/or the cache).
+ * - partial:     some items have live details, some are `unknown` (provider omitted
+ *                them, or it failed but other items were answered from the cache).
+ * - unavailable: no item has live details; every item is `unknown`.
  * - skipped:     no matching items, so the provider was not called.
  */
 export type EnrichmentStatus = 'complete' | 'partial' | 'unavailable' | 'skipped';
 
 export interface EnrichmentSummary {
   status: EnrichmentStatus;
-  /** Present when status is 'unavailable'. */
+  /** Why the provider gave no answer; present when it failed or timed out. */
   reason?: 'timeout' | 'provider_error';
-  /** Time spent waiting for the provider, in milliseconds. */
+  /** Time spent waiting for the provider, in milliseconds (0 if it wasn't called). */
   durationMs: number;
+  /** How many items were answered from the short-lived live-details cache. */
+  cacheHits: number;
 }
 
 export interface SearchQuery {

@@ -29,10 +29,10 @@ describe('createMetrics', () => {
 
   it('tallies enrichment outcomes and provider latency (skipped searches excluded)', () => {
     const metrics = createMetrics();
-    metrics.recordEnrichment({ status: 'complete', durationMs: 100 });
-    metrics.recordEnrichment({ status: 'unavailable', reason: 'timeout', durationMs: 1000 });
-    metrics.recordEnrichment({ status: 'unavailable', reason: 'provider_error', durationMs: 50 });
-    metrics.recordEnrichment({ status: 'skipped', durationMs: 0 });
+    metrics.recordEnrichment({ status: 'complete', durationMs: 100, cacheHits: 0 }, 3);
+    metrics.recordEnrichment({ status: 'unavailable', reason: 'timeout', durationMs: 1000, cacheHits: 0 }, 2);
+    metrics.recordEnrichment({ status: 'unavailable', reason: 'provider_error', durationMs: 50, cacheHits: 0 }, 2);
+    metrics.recordEnrichment({ status: 'skipped', durationMs: 0, cacheHits: 0 }, 0);
 
     const { enrichment } = metrics.snapshot();
     expect(enrichment).toMatchObject({
@@ -42,6 +42,15 @@ describe('createMetrics', () => {
       unavailable: { timeout: 1, provider_error: 1 },
     });
     expect(enrichment.providerLatencyMs.samples).toBe(3);
+  });
+
+  it('reports cache hits, misses and hit rate; fully cached searches add no provider latency', () => {
+    const metrics = createMetrics();
+    metrics.recordEnrichment({ status: 'complete', durationMs: 400, cacheHits: 0 }, 4);
+    metrics.recordEnrichment({ status: 'complete', durationMs: 0, cacheHits: 4 }, 4);
+    const snapshot = metrics.snapshot();
+    expect(snapshot.cache).toEqual({ hits: 4, misses: 4, hitRate: 0.5 });
+    expect(snapshot.enrichment.providerLatencyMs.samples).toBe(1);
   });
 });
 

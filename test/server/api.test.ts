@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SearchResponse } from '../../src/shared/contract.js';
 import { createApp } from '../../src/server/app.js';
 import { catalog } from '../../src/server/catalog/catalog.js';
+import { createLiveDetailsCache } from '../../src/server/enrichment/liveDetailsCache.js';
 import { baseDetailsFor, ProviderError, type LiveDetailsProvider } from '../../src/server/provider/provider.js';
 
 /** Deterministic provider: answers instantly using the simulated price book. */
@@ -83,5 +84,24 @@ describe('other routes', () => {
     const res = await request(appWith(healthyProvider())).get('/api/nope');
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('NOT_FOUND');
+  });
+});
+
+describe('GET /api/search with the live-details cache', () => {
+  it('answers a repeated search from the cache without calling the provider again', async () => {
+    const provider = healthyProvider();
+    const app = createApp({
+      catalog,
+      provider,
+      providerTimeoutMs: 1000,
+      liveDetailsCache: createLiveDetailsCache({ ttlMs: 30_000 }),
+    });
+
+    await request(app).get('/api/search').query({ q: 'pizza' });
+    const second = await request(app).get('/api/search').query({ q: 'pizza' });
+
+    expect(provider.getLiveDetails).toHaveBeenCalledTimes(1);
+    expect((second.body as SearchResponse).enrichment).toMatchObject({ status: 'complete', cacheHits: 6, durationMs: 0 });
+    expect(second.headers['server-timing']).toContain('cache;desc="6/6 hits"');
   });
 });

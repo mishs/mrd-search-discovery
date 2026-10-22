@@ -36,6 +36,8 @@ export interface MetricsSnapshot {
     skipped: number;
     providerLatencyMs: LatencySummary;
   };
+  /** Live-details cache effectiveness: items answered from cache vs fetched. */
+  cache: { hits: number; misses: number; hitRate: number };
 }
 
 /** Keeps the most recent `capacity` samples. */
@@ -67,7 +69,8 @@ class SampleWindow {
 
 export interface Metrics {
   recordRequest(route: string, status: number | 'aborted', durationMs: number): void;
-  recordEnrichment(summary: EnrichmentSummary): void;
+  /** `itemCount` is the number of items that needed live details. */
+  recordEnrichment(summary: EnrichmentSummary, itemCount: number): void;
   snapshot(): MetricsSnapshot;
   /** Express middleware that times every request it sees. */
   middleware: RequestHandler;
@@ -82,6 +85,7 @@ export function createMetrics(options: { now?: () => number; windowSize?: number
   const routes = new Map<string, { count: number; byStatus: Record<string, number>; latency: SampleWindow }>();
   const enrichment = { complete: 0, partial: 0, unavailable: { timeout: 0, provider_error: 0 }, skipped: 0 };
   const providerLatency = new SampleWindow(windowSize);
+  const cache = { hits: 0, misses: 0 };
 
   const metrics: Metrics = {
     recordRequest(route, status, durationMs) {
@@ -96,13 +100,16 @@ export function createMetrics(options: { now?: () => number; windowSize?: number
       entry.latency.add(durationMs);
     },
 
-    recordEnrichment(summary) {
+    recordEnrichment(summary, itemCount) {
+      cache.hits += summary.cacheHits;
+      cache.misses += itemCount - summary.cacheHits;
       if (summary.status === 'unavailable') {
         enrichment.unavailable[summary.reason ?? 'provider_error']++;
       } else {
         enrichment[summary.status]++;
       }
-      if (summary.status !== 'skipped') providerLatency.add(summary.durationMs);
+      // Only count searches that actually waited on the provider.
+      if (summary.status !== 'skipped' && summary.cacheHits < itemCount) providerLatency.add(summary.durationMs);
     },
 
     snapshot() {
@@ -119,6 +126,10 @@ export function createMetrics(options: { now?: () => number; windowSize?: number
           ...enrichment,
           unavailable: { ...enrichment.unavailable },
           providerLatencyMs: providerLatency.summary(),
+        },
+        cache: {
+          ...cache,
+          hitRate: cache.hits + cache.misses === 0 ? 0 : Math.round((cache.hits / (cache.hits + cache.misses)) * 100) / 100,
         },
       };
     },
