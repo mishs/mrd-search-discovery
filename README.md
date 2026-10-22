@@ -78,6 +78,18 @@ PROVIDER_MIN_LATENCY_MS=1500 PROVIDER_MAX_LATENCY_MS=1500 PROVIDER_TIMEOUT_MS=40
 PROVIDER_SEED=42 npm run dev                                           # same sequence every restart
 ```
 
+## Shareable URLs
+
+The current search lives in the page URL, so links and the browser's Back/Forward buttons work:
+
+```text
+http://localhost:3000/?q=peri+peri&category=pizza&sort=name
+```
+
+- Defaults are omitted (`/` means browse everything; `sort=popularity` is never written).
+- Unknown `category`/`sort` values in a link are ignored and the URL is rewritten to its canonical form (no error page for a stale link).
+- Each search you run adds one history entry; Back restores the previous query, filter and sort into the form and re-runs it. Retrying doesn't add entries.
+
 ## Caching
 
 Provider answers are cached on the server for `LIVE_DETAILS_CACHE_TTL_MS` (30 s by default):
@@ -249,7 +261,7 @@ src/
   client/
     App.svelte                state machine, latest-request guard, page layout
     components/               SearchForm, ResultsList, ResultCard, EnrichmentNotice
-    lib/                      api client, latest-request helper, formatting, timing
+    lib/                      api client, latest-request helper, URL state, formatting, timing
 test/
   server/                     search, query validation, provider, enrichment, HTTP API
   client/                     latest-request helper, formatting

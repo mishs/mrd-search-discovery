@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Category, SearchQuery, SearchResponse } from '../shared/contract';
+  import type { Category, CategorySlug, SearchQuery, SearchResponse, SortOption } from '../shared/contract';
   import { ApiError, fetchCategories, isAbortError, searchItems, searchUrl } from './lib/api';
   import { recordSearchTiming } from './lib/timing';
   import { createLatestRequest } from './lib/latest';
+  import { queryFromUrl, urlFromQuery } from './lib/urlState';
   import SearchForm from './components/SearchForm.svelte';
   import ResultsList from './components/ResultsList.svelte';
   import EnrichmentNotice from './components/EnrichmentNotice.svelte';
@@ -22,6 +23,24 @@
   let categories = $state<Category[]>([]);
   let categoriesFailed = $state(false);
 
+  // The URL is the source of truth on load, so links restore the same search.
+  // (Client-only app: `location` is always available here.)
+  const initialQuery = queryFromUrl(location.search);
+
+  // What the form currently shows. Owned here (and bound into SearchForm) so it can be
+  // set from outside the form, e.g. when back/forward restores an earlier search.
+  let formQ = $state(initialQuery.q);
+  let formCategory = $state<CategorySlug | ''>(initialQuery.category ?? '');
+  let formSort = $state<SortOption>(initialQuery.sort);
+
+  /**
+   * How a search affects browser history:
+   * - push:    a new search the user asked for (Back returns to the previous one)
+   * - replace: canonicalise the URL without adding an entry (initial load)
+   * - none:    the URL already describes this search (Back/Forward, retry)
+   */
+  type HistoryMode = 'push' | 'replace' | 'none';
+
   // Not reactive on purpose: bookkeeping that the template never reads.
   const latest = createLatestRequest();
   let lastResponse: SearchResponse | null = null;
@@ -30,6 +49,12 @@
   function categoryLabel(slug: string): string {
     return categories.find((c) => c.slug === slug)?.label ?? slug;
   }
+
+  // Readable titles make history entries and shared tabs recognisable.
+  const pageTitle = $derived.by(() => {
+    const query = view.kind === 'success' ? view.data.query : view.kind === 'idle' ? null : view.query;
+    return query?.q ? `“${query.q}” · Search & Discovery` : 'Search & Discovery';
+  });
 
   /** Visible results: the current ones, or the previous ones (marked stale) while loading. */
   const shown = $derived.by(() => {
@@ -57,7 +82,29 @@
     }
   });
 
-  async function runSearch(query: SearchQuery) {
+  function syncUrl(query: SearchQuery, mode: HistoryMode) {
+    const search = urlFromQuery(query);
+    if (mode === 'none' || search === location.search) return;
+    const url = `${location.pathname}${search}${location.hash}`;
+    if (mode === 'push') history.pushState(null, '', url);
+    else history.replaceState(null, '', url);
+  }
+
+  function showInForm(query: SearchQuery) {
+    formQ = query.q;
+    formCategory = query.category ?? '';
+    formSort = query.sort;
+  }
+
+  // Back/Forward: the URL changed under us, so restore its search into the form and run it.
+  function handlePopState() {
+    const query = queryFromUrl(location.search);
+    showInForm(query);
+    void runSearch(query, 'none');
+  }
+
+  async function runSearch(query: SearchQuery, historyMode: HistoryMode = 'push') {
+    syncUrl(query, historyMode);
     const ticket = latest.start();
     view = { kind: 'loading', query, previous: lastResponse };
     const startedAt = performance.now();
@@ -84,8 +131,8 @@
   }
 
   function retry() {
-    if (view.kind === 'error') void runSearch(view.query);
-    else if (view.kind === 'success') void runSearch(view.data.query);
+    if (view.kind === 'error') void runSearch(view.query, 'none');
+    else if (view.kind === 'success') void runSearch(view.data.query, 'none');
   }
 
   // onMount rather than $effect: this is one-off setup, not a reaction to state.
@@ -99,7 +146,7 @@
         if (!isAbortError(error)) categoriesFailed = true;
       });
 
-    void runSearch({ q: '', category: null, sort: 'popularity' });
+    void runSearch(initialQuery, 'replace');
 
     return () => {
       controller.abort();
@@ -108,13 +155,26 @@
   });
 </script>
 
+<svelte:window onpopstate={handlePopState} />
+
+<svelte:head>
+  <title>{pageTitle}</title>
+</svelte:head>
+
 <header>
   <h1>Find something to eat</h1>
   <p>Search dishes, restaurants and groceries. Prices and delivery times are live.</p>
 </header>
 
 <main>
-  <SearchForm {categories} {categoriesFailed} onsearch={runSearch} />
+  <SearchForm
+    {categories}
+    {categoriesFailed}
+    bind:q={formQ}
+    bind:category={formCategory}
+    bind:sort={formSort}
+    onsearch={runSearch}
+  />
 
   <p class="visually-hidden" role="status" aria-live="polite">{announcement}</p>
 
