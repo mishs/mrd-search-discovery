@@ -10,6 +10,7 @@ import type {
 } from '../shared/contract.js';
 import { CATEGORIES } from './catalog/catalog.js';
 import { enrichItems } from './enrichment/enrich.js';
+import { createMetrics, type Metrics } from './metrics.js';
 import type { LiveDetailsProvider } from './provider/provider.js';
 import { parseSearchQuery } from './search/query.js';
 import { searchCatalog } from './search/search.js';
@@ -24,6 +25,8 @@ export interface AppDependencies {
   /** Directory of the built client. When it contains index.html, Express serves it. */
   clientDir?: string;
   log?: (message: string) => void;
+  /** Injected so tests can read counters; a fresh instance is created otherwise. */
+  metrics?: Metrics;
 }
 
 /**
@@ -31,12 +34,19 @@ export interface AppDependencies {
  * drive it with supertest and inject a deterministic provider.
  */
 export function createApp(deps: AppDependencies): Express {
-  const { catalog, provider, providerTimeoutMs, clientDir, log = () => {} } = deps;
+  const { catalog, provider, providerTimeoutMs, clientDir, log = () => {}, metrics = createMetrics() } = deps;
   const app = express();
   app.disable('x-powered-by');
+  app.use('/api', metrics.middleware);
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  // Internal diagnostics. In production this would sit behind auth or on a private port.
+  app.get('/api/metrics', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(metrics.snapshot());
   });
 
   app.get('/api/categories', (_req, res) => {
@@ -68,6 +78,8 @@ export function createApp(deps: AppDependencies): Express {
       timeoutMs: providerTimeoutMs,
       signal: disconnected.signal,
     });
+
+    metrics.recordEnrichment(enrichment);
 
     if (disconnected.signal.aborted) {
       log(`search ${describeQuery(parsed.query)} abandoned: client disconnected, provider call aborted`);
