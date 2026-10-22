@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CatalogItem } from '../../src/shared/contract.js';
 import { catalog } from '../../src/server/catalog/catalog.js';
 import { enrichItems } from '../../src/server/enrichment/enrich.js';
+import { createLiveDetailsCache } from '../../src/server/enrichment/liveDetailsCache.js';
 import {
   ProviderError,
   type LiveDetailsProvider,
@@ -59,7 +60,7 @@ describe('enrichItems', () => {
     const provider = providerReturning(new Map());
     const result = await enrichItems([], provider, { timeoutMs: 1000 });
     expect(provider.getLiveDetails).not.toHaveBeenCalled();
-    expect(result).toEqual({ items: [], enrichment: { status: 'skipped', durationMs: 0 } });
+    expect(result).toEqual({ items: [], enrichment: { status: 'skipped', durationMs: 0, cacheHits: 0 } });
   });
 
   it('keeps catalog results but marks every item unknown when the provider fails', async () => {
@@ -133,5 +134,61 @@ describe('enrichItems', () => {
     outer.abort();
     await pending;
     expect(receivedSignal?.aborted).toBe(true);
+  });
+});
+
+describe('enrichItems with a live-details cache', () => {
+  const freshCache = () => createLiveDetailsCache({ ttlMs: 30_000, now: () => 0 });
+
+  it('reuses fresh answers and asks the provider only for the rest', async () => {
+    const cache = freshCache();
+    cache.set(first.id, details({ priceCents: 1190 }));
+    const provider = providerReturning(new Map([[second.id, details()], [third.id, details()]]));
+
+    const result = await enrichItems(items, provider, { timeoutMs: 1000, cache });
+
+    expect(provider.getLiveDetails).toHaveBeenCalledWith([second.id, third.id], expect.any(AbortSignal));
+    expect(result.enrichment).toMatchObject({ status: 'complete', cacheHits: 1 });
+    expect(result.items[0]?.live).toMatchObject({ status: 'available', priceCents: 1190 });
+  });
+
+  it('skips the provider entirely when every item is cached', async () => {
+    const cache = freshCache();
+    for (const item of items) cache.set(item.id, details());
+    const provider = providerReturning(new Map());
+
+    const result = await enrichItems(items, provider, { timeoutMs: 1000, cache });
+
+    expect(provider.getLiveDetails).not.toHaveBeenCalled();
+    expect(result.enrichment).toEqual({ status: 'complete', durationMs: 0, cacheHits: 3 });
+  });
+
+  it('caches "unavailable" answers but never malformed ones', async () => {
+    const cache = freshCache();
+    const provider = providerReturning(
+      new Map([
+        [first.id, details({ available: false })],
+        [second.id, details({ priceCents: 0 })],
+      ]),
+    );
+    await enrichItems([first, second], provider, { timeoutMs: 1000, cache });
+    expect(cache.get(first.id)).toMatchObject({ available: false });
+    expect(cache.get(second.id)).toBeUndefined();
+  });
+
+  it('on provider failure keeps cached items, marks the rest unknown, and caches nothing new', async () => {
+    const cache = freshCache();
+    cache.set(first.id, details());
+    const provider: LiveDetailsProvider = {
+      getLiveDetails: async () => {
+        throw new ProviderError('503');
+      },
+    };
+
+    const result = await enrichItems(items, provider, { timeoutMs: 1000, cache });
+
+    expect(result.enrichment).toMatchObject({ status: 'partial', reason: 'provider_error', cacheHits: 1 });
+    expect(result.items.map((i) => i.live.status)).toEqual(['available', 'unknown', 'unknown']);
+    expect(cache.size).toBe(1);
   });
 });

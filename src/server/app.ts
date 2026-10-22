@@ -10,6 +10,7 @@ import type {
 } from '../shared/contract.js';
 import { CATEGORIES } from './catalog/catalog.js';
 import { enrichItems } from './enrichment/enrich.js';
+import type { LiveDetailsCache } from './enrichment/liveDetailsCache.js';
 import { createMetrics, type Metrics } from './metrics.js';
 import type { LiveDetailsProvider } from './provider/provider.js';
 import { parseSearchQuery } from './search/query.js';
@@ -22,6 +23,8 @@ export interface AppDependencies {
   catalog: readonly CatalogItem[];
   provider: LiveDetailsProvider;
   providerTimeoutMs: number;
+  /** Optional short-lived cache of provider answers. Omit to always ask the provider. */
+  liveDetailsCache?: LiveDetailsCache;
   /** Directory of the built client. When it contains index.html, Express serves it. */
   clientDir?: string;
   log?: (message: string) => void;
@@ -34,7 +37,8 @@ export interface AppDependencies {
  * drive it with supertest and inject a deterministic provider.
  */
 export function createApp(deps: AppDependencies): Express {
-  const { catalog, provider, providerTimeoutMs, clientDir, log = () => {}, metrics = createMetrics() } = deps;
+  const { catalog, provider, providerTimeoutMs, liveDetailsCache, clientDir, log = () => {}, metrics = createMetrics() } =
+    deps;
   const app = express();
   app.disable('x-powered-by');
   app.use('/api', metrics.middleware);
@@ -77,9 +81,10 @@ export function createApp(deps: AppDependencies): Express {
     const { items, enrichment } = await enrichItems(matches, provider, {
       timeoutMs: providerTimeoutMs,
       signal: disconnected.signal,
+      ...(liveDetailsCache ? { cache: liveDetailsCache } : {}),
     });
 
-    metrics.recordEnrichment(enrichment);
+    metrics.recordEnrichment(enrichment, matches.length);
 
     if (disconnected.signal.aborted) {
       log(`search ${describeQuery(parsed.query)} abandoned: client disconnected, provider call aborted`);
@@ -88,11 +93,15 @@ export function createApp(deps: AppDependencies): Express {
 
     const body: SearchResponse = { query: parsed.query, total: items.length, items, enrichment };
     // Lightweight instrumentation, visible in the browser's Network > Timing panel.
-    res.setHeader('Server-Timing', `search;dur=${searchMs.toFixed(1)}, provider;dur=${enrichment.durationMs}`);
+    res.setHeader(
+      'Server-Timing',
+      `search;dur=${searchMs.toFixed(1)}, provider;dur=${enrichment.durationMs}, ` +
+        `cache;desc="${enrichment.cacheHits}/${matches.length} hits"`,
+    );
     res.setHeader('Cache-Control', 'no-store');
     log(
       `search ${describeQuery(parsed.query)} results=${items.length} enrichment=${enrichment.status}${enrichment.reason ? `(${enrichment.reason})` : ''} ` +
-        `providerMs=${enrichment.durationMs}`,
+        `providerMs=${enrichment.durationMs} cacheHits=${enrichment.cacheHits}`,
     );
     res.json(body);
   });

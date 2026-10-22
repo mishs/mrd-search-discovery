@@ -10,6 +10,8 @@ const configSchema = z
     PROVIDER_FAILURE_RATE: z.coerce.number().min(0).max(1).default(0.1),
     PROVIDER_TIMEOUT_MS: intFromEnv(1000),
     PROVIDER_SEED: z.coerce.number().int().optional(),
+    /** How long a provider answer may be reused. 0 disables the cache. */
+    LIVE_DETAILS_CACHE_TTL_MS: intFromEnv(30_000),
   })
   .refine((c) => c.PROVIDER_MIN_LATENCY_MS <= c.PROVIDER_MAX_LATENCY_MS, {
     message: 'PROVIDER_MIN_LATENCY_MS must be <= PROVIDER_MAX_LATENCY_MS',

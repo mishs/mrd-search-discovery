@@ -3,8 +3,10 @@ import type {
   EnrichmentSummary,
   LiveDetails,
   SearchResultItem,
+  UnknownReason,
 } from '../../shared/contract.js';
 import type { LiveDetailsProvider, ProviderItemDetails } from '../provider/provider.js';
+import type { LiveDetailsCache } from './liveDetailsCache.js';
 
 export class ProviderTimeoutError extends Error {
   override name = 'ProviderTimeoutError';
@@ -15,6 +17,8 @@ export interface EnrichOptions {
   timeoutMs: number;
   /** Aborted when the HTTP client goes away, so we stop provider work we no longer need. */
   signal?: AbortSignal;
+  /** Optional short-lived cache of provider answers (see liveDetailsCache.ts). */
+  cache?: LiveDetailsCache;
   now?: () => number;
 }
 
@@ -23,19 +27,67 @@ export interface EnrichResult {
   enrichment: EnrichmentSummary;
 }
 
-/** Treat provider data as untrusted: a malformed entry becomes "unknown", never R0. */
-function toLiveDetails(details: ProviderItemDetails | undefined): LiveDetails {
-  if (details === undefined) return { status: 'unknown', reason: 'not_returned' };
-  if (!details.available) return { status: 'unavailable' };
+/** Provider data is untrusted: only a well-formed answer may become a price. */
+function isWellFormed(details: ProviderItemDetails): boolean {
+  if (!details.available) return true;
   const { priceCents, deliveryMinutes } = details;
-  const valid =
+  return (
     Number.isInteger(priceCents) &&
     priceCents > 0 &&
     Number.isFinite(deliveryMinutes.min) &&
     deliveryMinutes.min >= 0 &&
-    deliveryMinutes.max >= deliveryMinutes.min;
-  if (!valid) return { status: 'unknown', reason: 'provider_error' };
-  return { status: 'available', priceCents, currency: 'ZAR', deliveryMinutes: { ...deliveryMinutes } };
+    deliveryMinutes.max >= deliveryMinutes.min
+  );
+}
+
+function toLiveDetails(details: ProviderItemDetails | undefined): LiveDetails {
+  if (details === undefined) return { status: 'unknown', reason: 'not_returned' };
+  if (!isWellFormed(details)) return { status: 'unknown', reason: 'provider_error' };
+  if (!details.available) return { status: 'unavailable' };
+  return {
+    status: 'available',
+    priceCents: details.priceCents,
+    currency: 'ZAR',
+    deliveryMinutes: { ...details.deliveryMinutes },
+  };
+}
+
+/**
+ * One provider call with a hard deadline. Resolves with the provider's answer or
+ * rejects with ProviderTimeoutError / the provider's error. The deadline holds
+ * even if the provider ignores the abort signal; the signal is still aborted so
+ * cooperative providers stop work. Nothing is left running afterwards.
+ */
+async function fetchWithDeadline(
+  provider: LiveDetailsProvider,
+  ids: readonly string[],
+  timeoutMs: number,
+  outerSignal: AbortSignal | undefined,
+): Promise<Map<string, ProviderItemDetails>> {
+  const controller = new AbortController();
+  const onOuterAbort = () => controller.abort(outerSignal?.reason);
+  if (outerSignal?.aborted) controller.abort(outerSignal.reason);
+  outerSignal?.addEventListener('abort', onOuterAbort, { once: true });
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new ProviderTimeoutError(`Provider did not respond within ${timeoutMs}ms`);
+      controller.abort(error);
+      reject(error);
+    }, timeoutMs);
+  });
+
+  const call = provider.getLiveDetails(ids, controller.signal);
+  // If the timeout wins the race, the provider's later rejection must not become an unhandled rejection.
+  call.catch(() => undefined);
+
+  try {
+    return await Promise.race([call, timeout]);
+  } finally {
+    clearTimeout(timer);
+    outerSignal?.removeEventListener('abort', onOuterAbort);
+  }
 }
 
 /**
@@ -43,11 +95,12 @@ function toLiveDetails(details: ProviderItemDetails | undefined): LiveDetails {
  *
  * Guarantees:
  * - No matches: the provider is not called (status "skipped").
- * - One batch call for all matches.
- * - Bounded wait: after `timeoutMs` we stop waiting even if the provider ignores
- *   the abort signal, and we abort it so well-behaved providers stop working.
- * - Failure or timeout never becomes a price or "out of stock": every item is
- *   returned as `unknown` with a reason, and the catalog results still show.
+ * - Fresh cached answers are reused; one batch call fetches only the rest, and
+ *   no call is made when everything is cached.
+ * - Bounded wait (see fetchWithDeadline).
+ * - Failure or timeout never becomes a price or "out of stock": affected items
+ *   are `unknown` with a reason, and the catalog results still show. Items
+ *   answered from the cache keep their live details ("partial").
  */
 export async function enrichItems(
   items: readonly CatalogItem[],
@@ -57,47 +110,49 @@ export async function enrichItems(
   const now = options.now ?? (() => performance.now());
 
   if (items.length === 0) {
-    return { items: [], enrichment: { status: 'skipped', durationMs: 0 } };
+    return { items: [], enrichment: { status: 'skipped', durationMs: 0, cacheHits: 0 } };
   }
 
-  const controller = new AbortController();
-  const onOuterAbort = () => controller.abort(options.signal?.reason);
-  if (options.signal?.aborted) controller.abort(options.signal.reason);
-  options.signal?.addEventListener('abort', onOuterAbort, { once: true });
+  const known = new Map<string, ProviderItemDetails>();
+  for (const item of items) {
+    const cached = options.cache?.get(item.id);
+    if (cached) known.set(item.id, cached);
+  }
+  const cacheHits = known.size;
+  const toFetch = items.map((item) => item.id).filter((id) => !known.has(id));
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      const error = new ProviderTimeoutError(`Provider did not respond within ${options.timeoutMs}ms`);
-      controller.abort(error);
-      reject(error);
-    }, options.timeoutMs);
+  let failure: Exclude<UnknownReason, 'not_returned'> | undefined;
+  let durationMs = 0;
+
+  if (toFetch.length > 0) {
+    const started = now();
+    try {
+      const fetched = await fetchWithDeadline(provider, toFetch, options.timeoutMs, options.signal);
+      for (const [id, details] of fetched) {
+        if (!toFetch.includes(id)) continue; // ignore anything we didn't ask for
+        known.set(id, details);
+        if (isWellFormed(details)) options.cache?.set(id, details);
+      }
+    } catch (error) {
+      failure = error instanceof ProviderTimeoutError ? 'timeout' : 'provider_error';
+    }
+    durationMs = Math.round(now() - started);
+  }
+
+  const enriched: SearchResultItem[] = items.map((item) => {
+    const details = known.get(item.id);
+    if (details === undefined && failure) return { ...item, live: { status: 'unknown', reason: failure } };
+    return { ...item, live: toLiveDetails(details) };
   });
 
-  const started = now();
-  const call = provider.getLiveDetails(
-    items.map((item) => item.id),
-    controller.signal,
-  );
-  // If the timeout wins the race, the provider's later rejection must not become an unhandled rejection.
-  call.catch(() => undefined);
-
-  try {
-    const details = await Promise.race([call, timeout]);
-    const enriched = items.map((item) => ({ ...item, live: toLiveDetails(details.get(item.id)) }));
-    const missing = enriched.some((item) => item.live.status === 'unknown');
-    return {
-      items: enriched,
-      enrichment: { status: missing ? 'partial' : 'complete', durationMs: Math.round(now() - started) },
-    };
-  } catch (error) {
-    const reason = error instanceof ProviderTimeoutError ? 'timeout' : 'provider_error';
-    return {
-      items: items.map((item) => ({ ...item, live: { status: 'unknown', reason } })),
-      enrichment: { status: 'unavailable', reason, durationMs: Math.round(now() - started) },
-    };
-  } finally {
-    clearTimeout(timer);
-    options.signal?.removeEventListener('abort', onOuterAbort);
+  const unknownCount = enriched.filter((item) => item.live.status === 'unknown').length;
+  let enrichment: EnrichmentSummary;
+  if (unknownCount === 0) {
+    enrichment = { status: 'complete', durationMs, cacheHits };
+  } else if (unknownCount === enriched.length) {
+    enrichment = { status: 'unavailable', ...(failure ? { reason: failure } : {}), durationMs, cacheHits };
+  } else {
+    enrichment = { status: 'partial', ...(failure ? { reason: failure } : {}), durationMs, cacheHits };
   }
+  return { items: enriched, enrichment };
 }
