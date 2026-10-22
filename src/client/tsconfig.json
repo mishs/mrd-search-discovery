@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["./**/*.ts", "./**/*.svelte", "../shared/**/*.ts"]
+  "include": ["./**/*.ts", "./**/*.svelte", "../shared/**/*.ts", "../../test/client/**/*.ts"]
 }
