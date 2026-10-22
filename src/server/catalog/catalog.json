@@ -1,0 +1,43 @@
+[
+  { "id": "itm-001", "name": "Classic Smash Burger", "description": "Two smashed beef patties, cheddar, pickles and house sauce on a brioche bun.", "category": "burgers", "restaurant": "Grillhouse 27", "tags": ["beef", "cheese"], "popularity": 96 },
+  { "id": "itm-002", "name": "Jalapeño Popper Burger", "description": "Beef patty with cream cheese, pickled jalapeños and crispy onions.", "category": "burgers", "restaurant": "Grillhouse 27", "tags": ["beef", "spicy"], "popularity": 81 },
+  { "id": "itm-003", "name": "Crispy Chicken Burger", "description": "Buttermilk fried chicken thigh, slaw and chipotle mayo.", "category": "burgers", "restaurant": "Bun & Barrel", "tags": ["chicken", "spicy"], "popularity": 88 },
+  { "id": "itm-004", "name": "Mushroom Swiss Burger", "description": "Beef patty, sautéed mushrooms, Swiss cheese and garlic aioli.", "category": "burgers", "restaurant": "Bun & Barrel", "tags": ["beef", "cheese"], "popularity": 64 },
+  { "id": "itm-005", "name": "Bean & Halloumi Burger", "description": "Spiced black bean patty with grilled halloumi and tomato relish.", "category": "burgers", "restaurant": "Green Fork Kitchen", "tags": ["vegetarian", "cheese"], "popularity": 57 },
+  { "id": "itm-006", "name": "Boerewors Burger", "description": "Coiled boerewors patty, chakalaka and caramelised onions.", "category": "burgers", "restaurant": "Grillhouse 27", "tags": ["beef", "local favourite"], "popularity": 73 },
+
+  { "id": "itm-007", "name": "Margherita Pizza", "description": "San Marzano tomato, fior di latte and fresh basil.", "category": "pizza", "restaurant": "Forno Rosso", "tags": ["vegetarian", "cheese"], "popularity": 92 },
+  { "id": "itm-008", "name": "Pepperoni Pizza", "description": "Tomato base, mozzarella and a generous layer of pepperoni.", "category": "pizza", "restaurant": "Forno Rosso", "tags": ["pork", "cheese"], "popularity": 96 },
+  { "id": "itm-009", "name": "Peri-Peri Chicken Pizza", "description": "Peri-peri chicken, peppers, red onion and mozzarella.", "category": "pizza", "restaurant": "Slice Society", "tags": ["chicken", "spicy"], "popularity": 85 },
+  { "id": "itm-010", "name": "Four Cheese Pizza", "description": "Mozzarella, gorgonzola, parmesan and ricotta on a white base.", "category": "pizza", "restaurant": "Slice Society", "tags": ["vegetarian", "cheese"], "popularity": 70 },
+  { "id": "itm-011", "name": "Biltong & Avo Pizza", "description": "Beef biltong, avocado, feta and a drizzle of sweet chilli.", "category": "pizza", "restaurant": "Forno Rosso", "tags": ["beef", "local favourite"], "popularity": 78 },
+  { "id": "itm-012", "name": "Roasted Veg Pizza", "description": "Roasted butternut, courgette, peppers and pesto.", "category": "pizza", "restaurant": "Green Fork Kitchen", "tags": ["vegan", "vegetarian"], "popularity": 52 },
+
+  { "id": "itm-013", "name": "Salmon Roses (6)", "description": "Fresh salmon wrapped around seasoned rice, topped with mayo.", "category": "sushi", "restaurant": "Umi Sushi Bar", "tags": ["salmon", "raw"], "popularity": 90 },
+  { "id": "itm-014", "name": "California Rolls (8)", "description": "Crab stick, avocado and cucumber, rolled in sesame.", "category": "sushi", "restaurant": "Umi Sushi Bar", "tags": ["seafood"], "popularity": 74 },
+  { "id": "itm-015", "name": "Spicy Tuna Maki (8)", "description": "Tuna with sriracha mayo and spring onion.", "category": "sushi", "restaurant": "Koi Kitchen", "tags": ["tuna", "spicy", "raw"], "popularity": 69 },
+  { "id": "itm-016", "name": "Prawn Tempura Rolls (8)", "description": "Crispy prawn tempura with avocado and teriyaki glaze.", "category": "sushi", "restaurant": "Koi Kitchen", "tags": ["prawn", "seafood"], "popularity": 83 },
+  { "id": "itm-017", "name": "Vegetable Futomaki (8)", "description": "Cucumber, avocado, carrot and pickled radish.", "category": "sushi", "restaurant": "Umi Sushi Bar", "tags": ["vegan", "vegetarian"], "popularity": 44 },
+  { "id": "itm-018", "name": "Salmon Poke Bowl", "description": "Salmon, sushi rice, edamame, mango and ponzu.", "category": "sushi", "restaurant": "Koi Kitchen", "tags": ["salmon", "bowl"], "popularity": 79 },
+
+  { "id": "itm-019", "name": "Açaí Bowl", "description": "Açaí blend topped with granola, banana and honey.", "category": "healthy", "restaurant": "Green Fork Kitchen", "tags": ["vegetarian", "breakfast", "bowl"], "popularity": 66 },
+  { "id": "itm-020", "name": "Chicken Caesar Salad", "description": "Grilled chicken, cos lettuce, parmesan and croutons.", "category": "healthy", "restaurant": "Daily Greens", "tags": ["chicken", "salad"], "popularity": 77 },
+  { "id": "itm-021", "name": "Falafel Wrap", "description": "Falafel, hummus, pickled cabbage and tahini in a wholewheat wrap.", "category": "healthy", "restaurant": "Daily Greens", "tags": ["vegan", "vegetarian"], "popularity": 61 },
+  { "id": "itm-022", "name": "Quinoa Power Bowl", "description": "Quinoa, roast sweet potato, chickpeas and lemon dressing.", "category": "healthy", "restaurant": "Green Fork Kitchen", "tags": ["vegan", "vegetarian", "bowl"], "popularity": 58 },
+  { "id": "itm-023", "name": "Grilled Hake & Greens", "description": "Line-caught hake with steamed greens and lemon butter.", "category": "healthy", "restaurant": "Daily Greens", "tags": ["fish", "seafood"], "popularity": 55 },
+  { "id": "itm-024", "name": "Green Smoothie", "description": "Spinach, apple, cucumber, ginger and lime.", "category": "healthy", "restaurant": "Daily Greens", "tags": ["vegan", "drink"], "popularity": 49 },
+
+  { "id": "itm-025", "name": "Chocolate Brownie", "description": "Dense dark chocolate brownie with a fudgy centre.", "category": "desserts", "restaurant": "Sugar Lab", "tags": ["chocolate", "vegetarian"], "popularity": 84 },
+  { "id": "itm-026", "name": "Malva Pudding", "description": "Warm apricot sponge with custard.", "category": "desserts", "restaurant": "Sugar Lab", "tags": ["local favourite", "vegetarian"], "popularity": 80 },
+  { "id": "itm-027", "name": "Crème Brûlée", "description": "Vanilla custard with a caramelised sugar crust.", "category": "desserts", "restaurant": "Forno Rosso", "tags": ["vegetarian"], "popularity": 62 },
+  { "id": "itm-028", "name": "Milk Tart Slice", "description": "Cinnamon-dusted custard tart on a buttery crust.", "category": "desserts", "restaurant": "Sugar Lab", "tags": ["local favourite", "vegetarian"], "popularity": 75 },
+  { "id": "itm-029", "name": "Vegan Chocolate Mousse", "description": "Silky avocado and cocoa mousse.", "category": "desserts", "restaurant": "Green Fork Kitchen", "tags": ["chocolate", "vegan"], "popularity": 41 },
+  { "id": "itm-030", "name": "Soft-Serve Sundae", "description": "Vanilla soft-serve with chocolate sauce and nuts.", "category": "desserts", "restaurant": "Bun & Barrel", "tags": ["ice cream", "vegetarian"], "popularity": 71 },
+
+  { "id": "itm-031", "name": "Full Cream Milk 2L", "description": "Fresh full cream milk.", "category": "groceries", "restaurant": "Corner Market", "tags": ["dairy", "essentials"], "popularity": 87 },
+  { "id": "itm-032", "name": "White Bread Loaf", "description": "Freshly baked sliced white bread, 700g.", "category": "groceries", "restaurant": "Corner Market", "tags": ["bakery", "essentials"], "popularity": 87 },
+  { "id": "itm-033", "name": "Free-Range Eggs (18)", "description": "Large free-range eggs.", "category": "groceries", "restaurant": "Corner Market", "tags": ["essentials", "breakfast"], "popularity": 82 },
+  { "id": "itm-034", "name": "Bananas 1kg", "description": "Ripe bananas, loose.", "category": "groceries", "restaurant": "FreshStop Grocer", "tags": ["fruit", "vegan"], "popularity": 68 },
+  { "id": "itm-035", "name": "Rooibos Tea (80 bags)", "description": "Naturally caffeine-free rooibos tea.", "category": "groceries", "restaurant": "FreshStop Grocer", "tags": ["drink", "local favourite"], "popularity": 59 },
+  { "id": "itm-036", "name": "Cheddar Cheese 400g", "description": "Mature cheddar block.", "category": "groceries", "restaurant": "FreshStop Grocer", "tags": ["dairy", "cheese"], "popularity": 63 }
+]
