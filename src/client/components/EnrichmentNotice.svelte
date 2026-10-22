@@ -18,7 +18,7 @@
   <div class="notice warning">
     <p>
       <strong>Live prices and delivery times are unavailable.</strong>
-      {reasonText} You can still browse; we'll show prices when the service recovers.
+      {reasonText} You can still browse; try again in a moment.
     </p>
     <button type="button" onclick={onretry}>Retry live prices</button>
   </div>
