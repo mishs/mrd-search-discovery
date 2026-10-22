@@ -79,6 +79,8 @@ browser → Netlify CDN ─┬─ /*      → dist/client (static, built by npm 
 - **No streaming.** Responses are buffered, which matters only for the streamed-enrichment idea in SOLUTION.md.
 - **Region.** Netlify's default function region is US East (Ohio), which adds round-trip time from other regions.
 - **Public diagnostics.** `/api/metrics` is reachable on the public URL. It holds only counters and latencies.
+
+**Diagnostics on the hosted demo.** Treat `/api/metrics` there as a snapshot of whichever instance answered, not a site-wide total. For per-request evidence that doesn't depend on the instance, use the `Server-Timing` header on each search (DevTools → Network → Timing) and the one-line-per-search log in Netlify's function logs (*Logs → Functions → api*). None of this is monitoring or alerting. A real deployment would export metrics to a shared backend and keep the endpoint internal.
 - **Platform limits.** Netlify's synchronous function limits (60 s execution, 6 MB buffered payload) are far above what this app uses. Plan quotas for function invocations apply.
 
 ## Simulated provider configuration
