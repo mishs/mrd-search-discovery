@@ -35,6 +35,12 @@ const server = app.listen(config.PORT, () => {
   );
 });
 
-const shutdown = () => server.close(() => process.exit(0));
+// Graceful shutdown: stop accepting connections, let in-flight searches finish
+// (each is bounded by PROVIDER_TIMEOUT_MS), and force-exit if that takes too long.
+const shutdown = () => {
+  server.close(() => process.exit(0));
+  server.closeIdleConnections();
+  setTimeout(() => process.exit(1), 5000).unref();
+};
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
