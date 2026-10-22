@@ -105,3 +105,33 @@ describe('GET /api/search with the live-details cache', () => {
     expect(second.headers['server-timing']).toContain('cache;desc="6/6 hits"');
   });
 });
+
+describe('GET /api/suggestions', () => {
+  it('returns capped, catalog-only suggestions without calling the provider', async () => {
+    const provider = healthyProvider();
+    const res = await request(appWith(provider)).get('/api/suggestions').query({ q: 'piz' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.q).toBe('piz');
+    expect(res.body.suggestions).toContainEqual({ label: 'Pizza', kind: 'category' });
+    expect(res.body.suggestions.length).toBeLessThanOrEqual(8);
+    expect(res.headers['cache-control']).toBe('private, max-age=300');
+    expect(provider.getLiveDetails).not.toHaveBeenCalled();
+  });
+
+  it('scopes suggestions to the category filter', async () => {
+    const res = await request(appWith(healthyProvider()))
+      .get('/api/suggestions')
+      .query({ q: 'ch', category: 'desserts' });
+    expect(res.body.suggestions.map((s: { label: string }) => s.label)).toEqual([
+      'Chocolate Brownie',
+      'Vegan Chocolate Mousse',
+    ]);
+  });
+
+  it('returns no suggestions for blank input and rejects an unknown category', async () => {
+    const app = appWith(healthyProvider());
+    expect((await request(app).get('/api/suggestions').query({ q: ' ' })).body.suggestions).toEqual([]);
+    expect((await request(app).get('/api/suggestions').query({ q: 'a', category: 'cars' })).status).toBe(400);
+  });
+});

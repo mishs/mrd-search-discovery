@@ -14,43 +14,47 @@ export const MAX_QUERY_LENGTH = 100;
  * - Repeated parameters (?q=a&q=b) arrive as arrays and are rejected.
  * - Unknown extra parameters are ignored.
  */
-const searchQuerySchema = z.object({
-  q: z
-    .string({ error: 'q must be a single string' })
-    .optional()
-    .transform((value) => value?.trim() ?? '')
-    .refine((value) => value.length <= MAX_QUERY_LENGTH, {
-      message: `q must be at most ${MAX_QUERY_LENGTH} characters`,
-    }),
-  category: z
-    .string({ error: 'category must be a single string' })
-    .optional()
-    .transform((value) => value?.trim() || null)
-    .pipe(
-      z.enum(CATEGORY_SLUGS, { error: `category must be one of: ${CATEGORY_SLUGS.join(', ')}` }).nullable(),
-    ),
-  sort: z
-    .string({ error: 'sort must be a single string' })
-    .optional()
-    .transform((value) => value?.trim() || 'popularity')
-    .pipe(z.enum(SORT_OPTIONS, { error: `sort must be one of: ${SORT_OPTIONS.join(', ')}` })),
-});
+const qField = z
+  .string({ error: 'q must be a single string' })
+  .optional()
+  .transform((value) => value?.trim() ?? '')
+  .refine((value) => value.length <= MAX_QUERY_LENGTH, {
+    message: `q must be at most ${MAX_QUERY_LENGTH} characters`,
+  });
 
-export type ParseResult =
-  | { ok: true; query: SearchQuery }
-  | { ok: false; details: { field: string; message: string }[] };
+const categoryField = z
+  .string({ error: 'category must be a single string' })
+  .optional()
+  .transform((value) => value?.trim() || null)
+  .pipe(z.enum(CATEGORY_SLUGS, { error: `category must be one of: ${CATEGORY_SLUGS.join(', ')}` }).nullable());
+
+const sortField = z
+  .string({ error: 'sort must be a single string' })
+  .optional()
+  .transform((value) => value?.trim() || 'popularity')
+  .pipe(z.enum(SORT_OPTIONS, { error: `sort must be one of: ${SORT_OPTIONS.join(', ')}` }));
+
+const searchQuerySchema = z.object({ q: qField, category: categoryField, sort: sortField });
+
+/** GET /api/suggestions: same q and category rules as search, no sort. */
+const suggestionsQuerySchema = z.object({ q: qField, category: categoryField });
+
+type FieldErrors = { field: string; message: string }[];
+
+const toFieldErrors = (error: z.ZodError): FieldErrors =>
+  error.issues.map((issue) => ({ field: issue.path.join('.') || 'query', message: issue.message }));
+
+export type ParseResult<T = SearchQuery> = { ok: true; query: T } | { ok: false; details: FieldErrors };
 
 export function parseSearchQuery(raw: unknown): ParseResult {
   const result = searchQuerySchema.safeParse(raw);
-  if (result.success) {
-    const query: SearchQuery = result.data;
-    return { ok: true, query };
-  }
-  return {
-    ok: false,
-    details: result.error.issues.map((issue) => ({
-      field: issue.path.join('.') || 'query',
-      message: issue.message,
-    })),
-  };
+  if (!result.success) return { ok: false, details: toFieldErrors(result.error) };
+  const query: SearchQuery = result.data;
+  return { ok: true, query };
+}
+
+export function parseSuggestionsQuery(raw: unknown): ParseResult<Pick<SearchQuery, 'q' | 'category'>> {
+  const result = suggestionsQuerySchema.safeParse(raw);
+  if (!result.success) return { ok: false, details: toFieldErrors(result.error) };
+  return { ok: true, query: result.data };
 }
