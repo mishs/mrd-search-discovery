@@ -8,7 +8,7 @@ A small full-stack slice of a food-delivery search experience. Customers search 
 
 > **Video walkthrough:** _VIDEO LINK TO BE ADDED BEFORE SUBMISSION_
 
-Design decisions and trade-offs are in [SOLUTION.md](SOLUTION.md).
+Design decisions and trade-offs are in [SOLUTION.md](SOLUTION.md). How AI was used is in [docs/ai-usage.md](docs/ai-usage.md).
 
 ## Prerequisites
 

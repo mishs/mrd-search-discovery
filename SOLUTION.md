@@ -169,6 +169,10 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 
 **Not yet verified by a person:** a manual review in a real browser, screen-reader testing (VoiceOver/NVDA), Safari/Firefox, macOS and Windows hosts.
 
+## AI assistance
+
+How AI was used, the prompts behind the work and what I verified are described in [docs/ai-usage.md](docs/ai-usage.md).
+
 ## Limitations and next steps
 
 **Limitations:**
