@@ -1,5 +1,6 @@
 <script lang="ts">
   import { SORT_OPTIONS, type Category, type CategorySlug, type SearchQuery, type SortOption } from '../../shared/contract';
+  import SearchInput from './SearchInput.svelte';
 
   interface Props {
     categories: Category[];
@@ -44,15 +45,11 @@
 <form role="search" onsubmit={submit}>
   <div class="field query">
     <label for="search-q">Search</label>
-    <input
+    <SearchInput
       id="search-q"
-      type="search"
-      name="q"
       bind:value={q}
-      maxlength="100"
-      placeholder="e.g. pizza, sushi, Sugar Lab, vegan"
-      autocomplete="off"
-      enterkeyhint="search"
+      category={category || null}
+      onselect={(label) => onsearch({ ...currentQuery(), q: label })}
     />
   </div>
 

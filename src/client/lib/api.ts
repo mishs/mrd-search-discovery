@@ -3,6 +3,8 @@ import type {
   CategoriesResponse,
   SearchQuery,
   SearchResponse,
+  SuggestionsResponse,
+  CategorySlug,
 } from '../../shared/contract';
 
 /** An error with a message that is safe and useful to show to the customer. */
@@ -35,6 +37,16 @@ async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
 
 export function fetchCategories(signal: AbortSignal): Promise<CategoriesResponse> {
   return getJson<CategoriesResponse>('/api/categories', signal);
+}
+
+export function fetchSuggestions(
+  q: string,
+  category: CategorySlug | null,
+  signal: AbortSignal,
+): Promise<SuggestionsResponse> {
+  const params = new URLSearchParams({ q });
+  if (category) params.set('category', category);
+  return getJson<SuggestionsResponse>(`/api/suggestions?${params.toString()}`, signal);
 }
 
 export function searchUrl(query: SearchQuery): string {
