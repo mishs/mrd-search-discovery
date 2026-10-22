@@ -173,7 +173,7 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 
 **Limitations:**
 - The catalog is static and in memory, sorted but not relevance-scored, with no pagination.
-- Metrics and the cache are per process and reset on restart.
+- Metrics and the cache are per process and reset on restart. Concurrent searches that miss the cache for the same items each call the provider (no request coalescing).
 - There are no isolated component tests (UI behaviour is covered end to end).
 - The client doesn't validate response shapes at runtime.
 - There is no rate limiting or security headers, and `/api/metrics` is unauthenticated.
