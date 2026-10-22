@@ -26,7 +26,8 @@ nvm use        # optional, picks up .nvmrc
 | `npm ci` | Clean install from the lockfile (exact pinned versions) |
 | `npm run dev` | API on <http://localhost:3000> with reload, plus the Vite dev server on <http://localhost:5173>. **Open 5173.** Vite proxies `/api` to Express. |
 | `npm run check` | Type-checks the server and tests with `tsc`, and the Svelte client with `svelte-check` (warnings fail the check) |
-| `npm test` | Runs the test suite once |
+| `npm test` | Runs the unit and API tests once (Vitest) |
+| `npm run test:e2e` | Builds, starts three servers with fixed provider behaviour (healthy, failing, slow) and runs the Playwright browser tests. First time: `npx playwright install chromium` |
 | `npm run build` | Builds the client to `dist/client` and compiles the server to `dist/server` |
 | `npm start` | Runs the built server. It serves the API **and** the built client on <http://localhost:3000> |
 
@@ -300,14 +301,16 @@ src/
     components/               SearchForm, SearchInput (combobox), ResultsList, ResultCard, EnrichmentNotice
     lib/                      api client, latest-request helper, suggestion loader, URL state, formatting, timing
 test/
-  server/                     search, query validation, provider, enrichment, HTTP API
-  client/                     latest-request helper, formatting
+  server/                     search, suggestions, validation, provider, enrichment, cache, metrics, HTTP API
+  client/                     latest-request guard, suggestion loader, URL state, formatting, timing
+e2e/                          Playwright browser tests against the built app
+.github/workflows/ci.yml      check · test · build on Node 22 and 24, then e2e
 ```
 
 ## Known limitations
 
 - The catalog is static and in memory; there is no persistence, pagination or relevance ranking (results are sorted, not scored).
-- Svelte components have no automated tests. UI behaviour was checked with a scripted headless browser during development (recorded in SOLUTION.md), not with a committed end-to-end suite.
+- Svelte components have no isolated component tests; UI behaviour is covered by the Playwright end-to-end suite and the unit-tested client logic.
 - The client trusts the shape of our own API responses (TypeScript types, no runtime validation on the client).
 - No rate limiting, security headers (e.g. helmet) or structured logging; metrics are in-process and reset on restart. These would be needed before production.
 - Verified on Node 22 (Linux). Node 24 is the recommended target; run `npm ci && npm run check && npm test && npm run build` on your machine to confirm.
