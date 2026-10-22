@@ -78,6 +78,14 @@ PROVIDER_MIN_LATENCY_MS=1500 PROVIDER_MAX_LATENCY_MS=1500 PROVIDER_TIMEOUT_MS=40
 PROVIDER_SEED=42 npm run dev                                           # same sequence every restart
 ```
 
+## Typeahead
+
+Typing in the search box suggests dishes, groceries, restaurants and categories.
+
+- **Fewer requests:** nothing is requested under 2 characters; one request is sent after a 150 ms pause in typing (not per keystroke); answers are remembered in memory (last 50, per category), so backspacing to an earlier prefix is instant; the browser may also reuse responses for 5 minutes. Older in-flight requests are aborted, and a late answer can never replace a newer one.
+- **Keyboard:** ↓/↑ move through suggestions, Enter picks the highlighted one and searches (or submits what you typed if none is highlighted), Esc closes the list. Screen readers hear the number of suggestions and the highlighted option.
+- Picking a suggestion runs a normal search for that text, so results and live prices behave exactly as for a typed search. Suggestions never trigger provider calls.
+
 ## Shareable URLs
 
 The current search lives in the page URL, so links and the browser's Back/Forward buttons work:
@@ -224,6 +232,34 @@ Degraded example (provider failed):
 }
 ```
 
+### `GET /api/suggestions`
+
+Typeahead suggestions from the catalog only (no provider call).
+
+| Parameter | Required | Behaviour |
+| --- | --- | --- |
+| `q` | no | Same rules as search. Every typed word must be the **start** of a word in the suggestion (`pe pi` → "Pepperoni Pizza"); case- and accent-insensitive. Blank → no suggestions. |
+| `category` | no | Same values as search; suggestions are limited to that category and category suggestions are omitted. Unknown value → `400`. |
+
+At most 8 suggestions, ranked by where the match starts, then popularity. Searching for any suggested label under the same category always returns results. Responses may be cached by the browser for 5 minutes (`Cache-Control: private, max-age=300`) because the catalog only changes on deploy.
+
+```bash
+curl "http://localhost:3000/api/suggestions?q=piz"
+```
+
+```json
+{
+  "q": "piz",
+  "suggestions": [
+    { "label": "Pizza", "kind": "category" },
+    { "label": "Pepperoni Pizza", "kind": "item" },
+    { "label": "Margherita Pizza", "kind": "item" }
+  ]
+}
+```
+
+(abridged) `kind` is `item`, `restaurant` or `category`.
+
 ### `GET /api/categories`
 
 ```json
@@ -254,14 +290,15 @@ src/
     config.ts                 environment variables, validated with zod
     catalog/                  catalog.json + startup validation
     search/search.ts          pure search / filter / sort
-    search/query.ts           query-string validation
+    search/query.ts           query-string validation (search and suggestions)
+    search/suggest.ts         prebuilt prefix index for typeahead
     provider/                 simulated upstream provider + seedable PRNG
     enrichment/enrich.ts      cache lookup, batch call, bounded wait, failure semantics
     enrichment/liveDetailsCache.ts  TTL cache with explicit freshness policy
   client/
     App.svelte                state machine, latest-request guard, page layout
-    components/               SearchForm, ResultsList, ResultCard, EnrichmentNotice
-    lib/                      api client, latest-request helper, URL state, formatting, timing
+    components/               SearchForm, SearchInput (combobox), ResultsList, ResultCard, EnrichmentNotice
+    lib/                      api client, latest-request helper, suggestion loader, URL state, formatting, timing
 test/
   server/                     search, query validation, provider, enrichment, HTTP API
   client/                     latest-request helper, formatting
