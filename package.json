@@ -1,0 +1,39 @@
+{
+  "name": "mrd-search-discovery",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Search & discovery mini-app: Express + TypeScript API with a Svelte 5 client and a simulated live pricing provider.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:client": "vite",
+    "check": "tsc -p tsconfig.json && svelte-check --tsconfig src/client/tsconfig.json --fail-on-warnings",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "start": "node dist/server/index.js"
+  },
+  "dependencies": {
+    "express": "5.3.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@tsconfig/svelte": "5.0.8",
+    "@types/express": "5.0.6",
+    "@types/node": "24.19.2",
+    "@types/supertest": "7.2.1",
+    "concurrently": "10.0.6",
+    "supertest": "7.3.1",
+    "svelte": "5.57.2",
+    "svelte-check": "4.7.7",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}
