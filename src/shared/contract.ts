@@ -97,6 +97,19 @@ export interface SearchResponse {
   enrichment: EnrichmentSummary;
 }
 
+export type SuggestionKind = 'item' | 'restaurant' | 'category';
+
+/** A typeahead suggestion. Searching for `label` is guaranteed to return results. */
+export interface Suggestion {
+  label: string;
+  kind: SuggestionKind;
+}
+
+export interface SuggestionsResponse {
+  q: string;
+  suggestions: Suggestion[];
+}
+
 export interface CategoriesResponse {
   categories: Category[];
 }
