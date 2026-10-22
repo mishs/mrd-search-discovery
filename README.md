@@ -77,14 +77,39 @@ PROVIDER_MIN_LATENCY_MS=1500 PROVIDER_MAX_LATENCY_MS=1500 PROVIDER_TIMEOUT_MS=40
 PROVIDER_SEED=42 npm run dev                                           # same sequence every restart
 ```
 
-The API logs one line per search, for example:
+## Instrumentation: how to view it
+
+| Where | What you see |
+| --- | --- |
+| **API terminal** | One log line per search: query, result count, enrichment outcome, provider wait. Abandoned (client-aborted) searches are logged too. |
+| **`GET /api/metrics`** | Request counts per route and status (including `aborted`), latency avg/p50/p95/max over the last 500 requests per route, and enrichment outcomes by status and failure reason. Open <http://localhost:3000/api/metrics> in a browser (it pretty-prints JSON), or `curl -s localhost:3000/api/metrics`. In dev the same path works through Vite on :5173. |
+| **DevTools → Network → (search request) → Timing** | `Server-Timing` breakdown: `search` (catalog filter/sort) and `provider` (time spent waiting for live details). |
+| **DevTools → Performance → Timings** | A `search` measure per completed search, end to end as the user experienced it. |
+| **DevTools console** (`npm run dev` only) | `[search] "pizza": 422ms total (search 0ms, provider 414ms)` |
+
+Example log lines:
 
 ```text
 [api] search q="pizza" category=* sort=popularity results=6 enrichment=complete providerMs=642
-[api] search q="" abandoned: client disconnected, provider call aborted
+[api] search q="" category=sushi sort=popularity abandoned: client disconnected, provider call aborted
 ```
 
-Each search response also has a `Server-Timing` header (`search;dur=…, provider;dur=…`). You can see it in the browser's DevTools under Network → Timing.
+Example `/api/metrics` (abridged):
+
+```json
+{
+  "startedAt": "2026-10-22T13:24:40.592Z",
+  "uptimeSeconds": 42,
+  "requests": {
+    "GET /api/search": { "count": 12, "byStatus": { "200": 10, "400": 1, "aborted": 1 },
+                         "latencyMs": { "samples": 12, "avg": 480.1, "p50": 412.3, "p95": 1004.2, "max": 1010.9 } }
+  },
+  "enrichment": { "complete": 8, "partial": 0, "unavailable": { "timeout": 1, "provider_error": 1 }, "skipped": 1,
+                  "providerLatencyMs": { "samples": 10, "avg": 512.4, "p50": 498, "p95": 1001.2, "max": 1001.2 } }
+}
+```
+
+The metrics endpoint is unauthenticated because this is a local exercise; in production it would be internal-only or replaced by a metrics backend.
 
 ## API
 
@@ -176,6 +201,10 @@ Degraded example (provider failed):
 
 (abridged; returns all six)
 
+### `GET /api/metrics`
+
+Diagnostics snapshot; see [Instrumentation](#instrumentation-how-to-view-it).
+
 ### `GET /api/health`
 
 ```json
@@ -190,6 +219,7 @@ src/
   server/
     index.ts                  reads config, wires the provider, starts listening
     app.ts                    Express app factory (routes, static files, errors)
+    metrics.ts                request/provider counters and latency summaries
     config.ts                 environment variables, validated with zod
     catalog/                  catalog.json + startup validation
     search/search.ts          pure search / filter / sort
@@ -199,7 +229,7 @@ src/
   client/
     App.svelte                state machine, latest-request guard, page layout
     components/               SearchForm, ResultsList, ResultCard, EnrichmentNotice
-    lib/                      api client, latest-request helper, formatting
+    lib/                      api client, latest-request helper, formatting, timing
 test/
   server/                     search, query validation, provider, enrichment, HTTP API
   client/                     latest-request helper, formatting
@@ -208,8 +238,7 @@ test/
 ## Known limitations
 
 - The catalog is static and in memory; there is no persistence, pagination or relevance ranking (results are sorted, not scored).
-- No typeahead, URL-synced state or caching (optional stretch goals, deliberately left out; see SOLUTION.md).
 - Svelte components have no automated tests. UI behaviour was checked with a scripted headless browser during development (recorded in SOLUTION.md), not with a committed end-to-end suite.
 - The client trusts the shape of our own API responses (TypeScript types, no runtime validation on the client).
-- No rate limiting, security headers (e.g. helmet) or structured logging. These would be needed before production.
+- No rate limiting, security headers (e.g. helmet) or structured logging; metrics are in-process and reset on restart. These would be needed before production.
 - Verified on Node 22 (Linux). Node 24 is the recommended target; run `npm ci && npm run check && npm test && npm run build` on your machine to confirm.
