@@ -233,7 +233,7 @@ At this point, I asked Claude to include the stretch goals and propose an update
 
 ### 5. Repository set-up confirmation (summary)
 
-I created the empty repository myself and initially kept it private. I will confirm the final push, PR and merge details against the GitHub history before completing the delivery account below.
+I created the empty repository myself and kept it private while the work was reviewed. The push, PR and merge history is recorded under [How the work reached GitHub](#how-the-work-reached-github).
 
 ## What the AI produced
 
@@ -245,7 +245,7 @@ Claude's implementation handoff covered:
 - Automated tests, scripted browser checks, README.md and SOLUTION.md.
 - Following my scope expansion: instrumentation, provider-detail caching, URL-synced state, typeahead, Playwright tests and GitHub Actions configuration.
 
-I am reconciling this handoff with the final repository. I will use the final test output and CI run links for exact counts and results, rather than repeat figures from an intermediate handoff.
+Reconciled with the final repository (`main` at `ccccc48`): 93 unit and API tests in 13 files (`test/server`, `test/client`) and 6 Playwright end-to-end tests (`e2e/`). Those counts come from the final test output and the GitHub Actions runs linked below, not from an intermediate handoff.
 
 ## Decisions: accepted, changed, rejected
 
@@ -263,29 +263,46 @@ These are the main choices I asked for or received for review, together with the
 | Retain previous results while loading and mark them stale | Claude's proposal; my review pending | Preserve context while making the pending update clear. |
 | Stretch goals brought into scope | My follow-up instruction | Extend the core experience, accepting the extra implementation and review work. |
 | Instrumentation → cache → URL state → typeahead | Claude's proposed execution order | Establish visibility before optimisation and build related features in a useful sequence. |
-| Provider-detail cache with a 30-second TTL; failures not cached | Claude's reported implementation; my review pending | Balance repeated lookups against price freshness. I need to verify expiry, cache keys and failure behaviour. |
-| Prefix suggestions with request reduction | Claude's reported implementation; my review pending | Use catalog data for suggestions without fetching live details on every keystroke. |
-| Category suggestion performs a text search | Claude's reported simplification; my review pending | Keep one selection behaviour. I need to check its interaction with an active category filter. |
-| Toolchain versions and TypeScript settings | Final configuration review pending | Base the choice on actual compatibility and the lockfile. Record the versions and strictness settings used. |
+| Provider-detail cache with a 30-second TTL; failures not cached | Claude's implementation; my review pending | Balance repeated lookups against price freshness. In the code (`src/server/enrichment/liveDetailsCache.ts`): keyed by item id, entries expire after `LIVE_DETAILS_CACHE_TTL_MS` (default 30 000 ms, `0` disables it), at most 1 000 entries with the oldest evicted first, and only real provider answers are stored. Failures, timeouts and malformed entries are never cached. Covered by `test/server/liveDetailsCache.test.ts` and the provider-failure case in `test/server/enrich.test.ts`. The cache is in-process, so it is per instance. |
+| Prefix suggestions with request reduction | Claude's implementation; my review pending | Use catalog data for suggestions without fetching live details on every keystroke. |
+| Category suggestion performs a text search | Claude's simplification; my review pending | Keep one selection behaviour. With a category filter active, suggestions are limited to that category and category labels are not offered (`src/server/search/suggest.ts`). Tests: "respects the category filter and omits category suggestions when one is chosen" and "only suggests labels that return results when searched (under the same filter)" in `test/server/suggest.test.ts`. |
+| Toolchain versions and TypeScript settings | Recorded from the lockfile; my review pending | Node 24 LTS in `.nvmrc` (engines `>=22.12.0`, CI on 22 and 24). Express 5.3.0, TypeScript 6.0.3, zod 4.6.7, Svelte 5.57.2, Vite 8.3.5, Vitest 5.0.5, Supertest 7.3.1, Playwright 1.64.1, tsx 4.23.15, svelte-check 4.7.7. TypeScript runs with `strict`, `noUncheckedIndexedAccess` and `verbatimModuleSyntax` on server and client, plus `noImplicitOverride` on the server. |
 
-I will add concrete changes or rejected suggestions once I have confirmed the relevant review decisions. For suggestions, I also need to verify behaviour with category filtering before describing any guarantee that a suggestion returns results.
+I will add concrete changes or rejected suggestions once I have confirmed the relevant review decisions. The guarantee that a suggestion returns results under the active category filter is covered by an automated test; I have not yet confirmed it by hand.
 
 ## Verification evidence
 
-Claude's automated-check results are referenced in [SOLUTION.md → Verification actually performed](../SOLUTION.md#verification-actually-performed). I am checking that this record matches the final code and distinguishes local checks from GitHub CI runs.
+Claude's automated-check results are in [SOLUTION.md → Verification actually performed](../SOLUTION.md#verification-actually-performed). Two kinds of evidence are kept apart there:
+
+- **Local checks** run by Claude in a Linux development environment (Node 22): type check, unit/API tests, e2e, build, built start and scripted browser checks.
+- **GitHub Actions runs** on GitHub's runners: every PR and every merge to `main` ran type check, tests, build and a smoke test of the built server on Node 22 and 24, plus the Playwright job from PR #6 onwards. All of them passed. The final `main` commit `ccccc48` passed in [run 39821278042](https://github.com/mishs/mrd-search-discovery/actions/runs/39821278042).
 
 Still to be confirmed by me before submission:
 
 - My manual browser review: search, filter, sort, slow or failing provider responses, recovery, mobile layout and keyboard interaction.
 - Running the documented setup and application commands on my own machine.
 - My review of the request flow, failure handling, caching, stale-response protection and the tests that cover them.
-- The final CI result, checked commit, public repository contents and video access.
+- The public repository contents and video access. (The CI result for the final `main` commit is recorded above; I still need to check the commit I submit is that one.)
 
 I will update this section with what I actually checked and any remaining limitations. A configured workflow alone is not a completed CI run.
 
 ## How the work reached GitHub
 
-I created the repositories and asked Claude to help with delivery. I will complete this account from the actual push, PR and merge history, including the CI results associated with those changes. I remain responsible for reviewing the final result before making the submission repository public.
+I created the repositories and asked Claude to help with delivery. Claude pushed the branches and opened the pull requests. On 22 Oct 2026 the repository was recreated once, because GitHub Actions did not start any runs on the first copy.
+
+The work landed as one PR per feature, in the order it was built. Each was merged only after CI passed on its exact head commit:
+
+| PR | Change | CI on the PR head | Merged (UTC) |
+| --- | --- | --- | --- |
+| [#1](https://github.com/mishs/mrd-search-discovery/pull/1) | Search & discovery: Express API, simulated provider, Svelte UI | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39817756009) | 16:55 |
+| [#2](https://github.com/mishs/mrd-search-discovery/pull/2) | Instrumentation | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39818798702) | 17:00 |
+| [#3](https://github.com/mishs/mrd-search-discovery/pull/3) | Live-details cache | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39818950447) | 17:01 |
+| [#4](https://github.com/mishs/mrd-search-discovery/pull/4) | URL-synced state | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39819102170) | 17:02 |
+| [#5](https://github.com/mishs/mrd-search-discovery/pull/5) | Typeahead suggestions | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39819269808) | 17:03 |
+| [#6](https://github.com/mishs/mrd-search-discovery/pull/6) | End-to-end tests in CI | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39819436260) | 17:05 |
+| [#7](https://github.com/mishs/mrd-search-discovery/pull/7) | SOLUTION refresh | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39819747644) | 17:17 |
+
+The push to `main` after each merge also passed CI. I remain responsible for reviewing the final result before making the submission repository public.
 
 This page records the AI contribution directly. I am keeping the Git account factual.
 
