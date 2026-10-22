@@ -85,8 +85,9 @@
     else if (view.kind === 'success') void runSearch(view.data.query);
   }
 
-  // onMount rather than $effect: this is one-off setup that should not re-run
-  // when state read inside runSearch changes. The cleanup aborts in-flight requests.
+  // onMount rather than $effect: this is one-off setup, not a reaction to state.
+  // An $effect re-runs whenever $state it reads synchronously changes; runSearch reads
+  // none today, but that would silently break if it ever did. Cleanup aborts in-flight requests.
   onMount(() => {
     const controller = new AbortController();
     fetchCategories(controller.signal)
