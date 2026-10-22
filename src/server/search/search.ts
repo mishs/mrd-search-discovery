@@ -16,9 +16,17 @@ export function normalise(text: string): string {
     .trim();
 }
 
+// Normalised text is computed once per catalog item and reused across searches.
+const searchableTextCache = new WeakMap<CatalogItem, string>();
+
 /** Fields searched: name, category label, restaurant and tags. */
 function searchableText(item: CatalogItem): string {
-  return normalise([item.name, CATEGORY_LABELS[item.category], item.restaurant, ...item.tags].join(' '));
+  let text = searchableTextCache.get(item);
+  if (text === undefined) {
+    text = normalise([item.name, CATEGORY_LABELS[item.category], item.restaurant, ...item.tags].join(' '));
+    searchableTextCache.set(item, text);
+  }
+  return text;
 }
 
 /**

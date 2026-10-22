@@ -1,10 +1,11 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import express, { type ErrorRequestHandler, type Express } from 'express';
 import type {
   ApiErrorBody,
   CatalogItem,
   CategoriesResponse,
+  SearchQuery,
   SearchResponse,
 } from '../shared/contract.js';
 import { CATEGORIES } from './catalog/catalog.js';
@@ -12,6 +13,9 @@ import { enrichItems } from './enrichment/enrich.js';
 import type { LiveDetailsProvider } from './provider/provider.js';
 import { parseSearchQuery } from './search/query.js';
 import { searchCatalog } from './search/search.js';
+
+const describeQuery = (query: SearchQuery): string =>
+  `q=${JSON.stringify(query.q)} category=${query.category ?? '*'} sort=${query.sort}`;
 
 export interface AppDependencies {
   catalog: readonly CatalogItem[];
@@ -65,13 +69,17 @@ export function createApp(deps: AppDependencies): Express {
       signal: disconnected.signal,
     });
 
+    if (disconnected.signal.aborted) {
+      log(`search ${describeQuery(parsed.query)} abandoned: client disconnected, provider call aborted`);
+      return;
+    }
+
     const body: SearchResponse = { query: parsed.query, total: items.length, items, enrichment };
     // Lightweight instrumentation, visible in the browser's Network > Timing panel.
     res.setHeader('Server-Timing', `search;dur=${searchMs.toFixed(1)}, provider;dur=${enrichment.durationMs}`);
     res.setHeader('Cache-Control', 'no-store');
     log(
-      `search q=${JSON.stringify(parsed.query.q)} category=${parsed.query.category ?? '*'} sort=${parsed.query.sort} ` +
-        `results=${items.length} enrichment=${enrichment.status}${enrichment.reason ? `(${enrichment.reason})` : ''} ` +
+      `search ${describeQuery(parsed.query)} results=${items.length} enrichment=${enrichment.status}${enrichment.reason ? `(${enrichment.reason})` : ''} ` +
         `providerMs=${enrichment.durationMs}`,
     );
     res.json(body);
@@ -83,7 +91,17 @@ export function createApp(deps: AppDependencies): Express {
   });
 
   if (clientDir && existsSync(join(clientDir, 'index.html'))) {
-    app.use(express.static(clientDir));
+    app.use(
+      express.static(clientDir, {
+        // Vite fingerprints files in /assets, so they can be cached for a long time.
+        // index.html is not fingerprinted and is revalidated on every load.
+        setHeaders: (res, filePath) => {
+          if (filePath.includes(`${sep}assets${sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          }
+        },
+      }),
+    );
   }
 
   const onError: ErrorRequestHandler = (error, _req, res, _next) => {
