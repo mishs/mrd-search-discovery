@@ -4,30 +4,40 @@
   interface Props {
     categories: Category[];
     categoriesFailed: boolean;
+    /** Form values are bindable so the parent can restore them from the URL (links, back/forward). */
+    q: string;
+    category: CategorySlug | '';
+    sort: SortOption;
     onsearch: (query: SearchQuery) => void;
   }
 
-  let { categories, categoriesFailed, onsearch }: Props = $props();
-
-  // The form owns what the user is typing; the parent only hears about submitted searches.
-  let q = $state('');
-  let category = $state<CategorySlug | ''>('');
-  let sort = $state<SortOption>('popularity');
+  let {
+    categories,
+    categoriesFailed,
+    q = $bindable(),
+    category = $bindable(),
+    sort = $bindable(),
+    onsearch,
+  }: Props = $props();
 
   const sortLabels: Record<SortOption, string> = {
     popularity: 'Most popular',
     name: 'Name (A–Z)',
   };
 
+  function currentQuery(): SearchQuery {
+    return { q: q.trim(), category: category || null, sort };
+  }
+
   function submit(event: SubmitEvent) {
     event.preventDefault();
-    onsearch({ q: q.trim(), category: category || null, sort });
+    onsearch(currentQuery());
   }
 
   // Changing a filter or sort is an explicit user action, so it searches straight away
   // via an event handler (not an $effect watching the values).
   function refine() {
-    onsearch({ q: q.trim(), category: category || null, sort });
+    onsearch(currentQuery());
   }
 </script>
 

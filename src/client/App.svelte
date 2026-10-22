@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Category, SearchQuery, SearchResponse } from '../shared/contract';
+  import type { Category, CategorySlug, SearchQuery, SearchResponse, SortOption } from '../shared/contract';
   import { ApiError, fetchCategories, isAbortError, searchItems, searchUrl } from './lib/api';
   import { recordSearchTiming } from './lib/timing';
   import { createLatestRequest } from './lib/latest';
@@ -21,6 +21,12 @@
   let view = $state<ViewState>({ kind: 'idle' });
   let categories = $state<Category[]>([]);
   let categoriesFailed = $state(false);
+
+  // What the form currently shows. Owned here (and bound into SearchForm) so it can be
+  // set from outside the form, e.g. when restoring a search from the URL.
+  let formQ = $state('');
+  let formCategory = $state<CategorySlug | ''>('');
+  let formSort = $state<SortOption>('popularity');
 
   // Not reactive on purpose: bookkeeping that the template never reads.
   const latest = createLatestRequest();
@@ -114,7 +120,14 @@
 </header>
 
 <main>
-  <SearchForm {categories} {categoriesFailed} onsearch={runSearch} />
+  <SearchForm
+    {categories}
+    {categoriesFailed}
+    bind:q={formQ}
+    bind:category={formCategory}
+    bind:sort={formSort}
+    onsearch={runSearch}
+  />
 
   <p class="visually-hidden" role="status" aria-live="polite">{announcement}</p>
 
