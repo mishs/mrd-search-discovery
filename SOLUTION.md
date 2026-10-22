@@ -179,6 +179,7 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 - There is no rate limiting or security headers, and `/api/metrics` is unauthenticated.
 - Live-region announcements don't repeat when the text is identical.
 - A category suggestion runs a text search rather than setting the category filter.
+- The hosted Netlify demo runs the same Express app as a function, so its cache and metrics are per instance and reset on cold starts, and a browser abort does not cancel the provider wait server-side. The local server keeps the full behaviour. Details in [README → Live demo](README.md#live-demo-netlify).
 
 **Next steps, in priority order:**
 

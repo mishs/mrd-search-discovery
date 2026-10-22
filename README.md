@@ -52,6 +52,35 @@ browser → Vite :5173 ──/api──▶ Express :3000     browser → Express
 
 Both arrangements give the browser a single origin, so CORS is never needed.
 
+## Live demo (Netlify)
+
+> **Live demo:** _DEMO LINK TO BE ADDED AFTER DEPLOYMENT_
+
+The hosted demo is for trying the app without installing anything. It runs the **same Express app**; only the hosting around it differs. Locally, `npm run dev` and `npm start` work exactly as described above.
+
+```text
+browser → Netlify CDN ─┬─ /*      → dist/client (static, built by npm run build)
+                       └─ /api/*  → rewrite → Netlify Function "api"
+                                              └─ serverless-http → the Express app (createConfiguredApp)
+```
+
+- `netlify.toml` sets the build (`npm run build`, publish `dist/client`, Node 24) and rewrites `/api/*` to the function. The browser still sees one origin, so no CORS.
+- `netlify/functions/api.ts` wraps the app with [`serverless-http`](https://github.com/dougmoscrop/serverless-http), following [Netlify's Express guide](https://docs.netlify.com/build/frameworks/framework-setup-guides/express/).
+- `src/server/bootstrap.ts` builds the app from config. The local server and the function both use it, so the catalog, provider, timeout and cache wiring are identical.
+- The provider variables in the next section apply here too. Set them under **Site configuration → Environment variables** in Netlify. With the defaults, about 1 in 10 searches shows the degraded state, which is intended.
+
+**Deploying** (one-off, from the Netlify dashboard): *Add new project (older dashboards: Add new site) → Import an existing project → GitHub*, choose this repository and keep the settings read from `netlify.toml`. The repository can stay private, but the site URL is public. From a terminal, `npx netlify-cli deploy` builds and creates a draft (preview) deploy; `--prod` publishes it.
+
+**Hosting limitations of the demo** (they don't apply to `npm start`):
+
+- **Per-instance memory.** The live-details cache and `/api/metrics` live in each function instance. They reset on a cold start, and two requests can reach different instances, so cache hits and metric counts are not consistent across requests.
+- **Cold starts.** The first request after an idle period is slower while an instance starts.
+- **No server-side cancellation.** The function response is buffered, so a browser abort does not reach Express and the provider wait is not cut short. It is still bounded by `PROVIDER_TIMEOUT_MS`, and the client's latest-request guard still discards stale responses.
+- **No streaming.** Responses are buffered, which matters only for the streamed-enrichment idea in SOLUTION.md.
+- **Region.** Netlify's default function region is US East (Ohio), which adds round-trip time from other regions.
+- **Public diagnostics.** `/api/metrics` is reachable on the public URL. It holds only counters and latencies.
+- **Platform limits.** Netlify's synchronous function limits (60 s execution, 6 MB buffered payload) are far above what this app uses. Plan quotas for function invocations apply.
+
 ## Simulated provider configuration
 
 The provider is an in-process module (`src/server/provider/provider.ts`). Configure it with environment variables:
@@ -285,7 +314,8 @@ Diagnostics snapshot; see [Instrumentation](#instrumentation-how-to-view-it).
 src/
   shared/contract.ts          API types shared by server and client
   server/
-    index.ts                  reads config, wires the provider, starts listening
+    index.ts                  reads config, starts listening (local server)
+    bootstrap.ts              builds the app from config; shared by the local server and the demo function
     app.ts                    Express app factory (routes, static files, errors)
     metrics.ts                request/provider counters and latency summaries
     config.ts                 environment variables, validated with zod
@@ -301,9 +331,10 @@ src/
     components/               SearchForm, SearchInput (combobox), ResultsList, ResultCard, EnrichmentNotice
     lib/                      api client, latest-request helper, suggestion loader, URL state, formatting, timing
 test/
-  server/                     search, suggestions, validation, provider, enrichment, cache, metrics, HTTP API
+  server/                     search, suggestions, validation, provider, enrichment, cache, metrics, HTTP API, demo function
   client/                     latest-request guard, suggestion loader, URL state, formatting, timing
 e2e/                          Playwright browser tests against the built app
+netlify/functions/api.ts      hosted demo: the same app as a Netlify Function (see netlify.toml)
 .github/workflows/ci.yml      check · test · build on Node 22 and 24, then e2e
 ```
 

@@ -1,31 +1,14 @@
 import { fileURLToPath } from 'node:url';
-import { createApp } from './app.js';
-import { catalog } from './catalog/catalog.js';
-import { createLiveDetailsCache } from './enrichment/liveDetailsCache.js';
+import { createConfiguredApp } from './bootstrap.js';
 import { loadConfig } from './config.js';
-import { createSimulatedProvider } from './provider/provider.js';
-import { createSeededRandom } from './provider/random.js';
 
 const config = loadConfig();
-
-const provider = createSimulatedProvider({
-  minLatencyMs: config.PROVIDER_MIN_LATENCY_MS,
-  maxLatencyMs: config.PROVIDER_MAX_LATENCY_MS,
-  failureRate: config.PROVIDER_FAILURE_RATE,
-  random: config.PROVIDER_SEED === undefined ? Math.random : createSeededRandom(config.PROVIDER_SEED),
-});
 
 // Built layout: dist/server/index.js serves dist/client. In development this resolves to
 // src/client, which has no index.html, so nothing is served and Vite handles the UI.
 const clientDir = fileURLToPath(new URL('../client/', import.meta.url));
 
-const app = createApp({
-  catalog,
-  provider,
-  providerTimeoutMs: config.PROVIDER_TIMEOUT_MS,
-  ...(config.LIVE_DETAILS_CACHE_TTL_MS > 0
-    ? { liveDetailsCache: createLiveDetailsCache({ ttlMs: config.LIVE_DETAILS_CACHE_TTL_MS }) }
-    : {}),
+const app = createConfiguredApp(config, {
   clientDir,
   log: (message) => console.log(`[api] ${message}`),
 });
