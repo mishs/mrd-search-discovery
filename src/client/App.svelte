@@ -176,7 +176,7 @@
     onsearch={runSearch}
   />
 
-  <p class="visually-hidden" role="status" aria-live="polite">{announcement}</p>
+  <p id="search-status" class="visually-hidden" role="status" aria-live="polite">{announcement}</p>
 
   <section aria-labelledby="results-heading">
     <h2 id="results-heading" class="visually-hidden">Results</h2>

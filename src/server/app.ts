@@ -7,14 +7,16 @@ import type {
   CategoriesResponse,
   SearchQuery,
   SearchResponse,
+  SuggestionsResponse,
 } from '../shared/contract.js';
 import { CATEGORIES } from './catalog/catalog.js';
 import { enrichItems } from './enrichment/enrich.js';
 import type { LiveDetailsCache } from './enrichment/liveDetailsCache.js';
 import { createMetrics, type Metrics } from './metrics.js';
 import type { LiveDetailsProvider } from './provider/provider.js';
-import { parseSearchQuery } from './search/query.js';
+import { parseSearchQuery, parseSuggestionsQuery } from './search/query.js';
 import { searchCatalog } from './search/search.js';
+import { createSuggestionIndex } from './search/suggest.js';
 
 const describeQuery = (query: SearchQuery): string =>
   `q=${JSON.stringify(query.q)} category=${query.category ?? '*'} sort=${query.sort}`;
@@ -42,6 +44,7 @@ export function createApp(deps: AppDependencies): Express {
   const app = express();
   app.disable('x-powered-by');
   app.use('/api', metrics.middleware);
+  const suggestionIndex = createSuggestionIndex(catalog);
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -55,6 +58,25 @@ export function createApp(deps: AppDependencies): Express {
 
   app.get('/api/categories', (_req, res) => {
     const body: CategoriesResponse = { categories: [...CATEGORIES] };
+    res.json(body);
+  });
+
+  // Typeahead. Catalog-only (no provider call), so it is cheap and the browser may cache it.
+  app.get('/api/suggestions', (req, res) => {
+    const parsed = parseSuggestionsQuery(req.query);
+    if (!parsed.ok) {
+      const body: ApiErrorBody = {
+        error: { code: 'INVALID_QUERY', message: 'Invalid suggestion parameters', details: parsed.details },
+      };
+      res.status(400).json(body);
+      return;
+    }
+    const body: SuggestionsResponse = {
+      q: parsed.query.q,
+      suggestions: suggestionIndex.suggest(parsed.query.q, parsed.query.category),
+    };
+    // The catalog only changes on deploy, so short-lived browser caching is safe.
+    res.setHeader('Cache-Control', 'private, max-age=300');
     res.json(body);
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSearchQuery } from '../../src/server/search/query.js';
+import { parseSearchQuery, parseSuggestionsQuery } from '../../src/server/search/query.js';
 
 describe('parseSearchQuery', () => {
   it('applies defaults when nothing is provided', () => {
@@ -34,5 +34,13 @@ describe('parseSearchQuery', () => {
 
   it('ignores unknown extra parameters', () => {
     expect(parseSearchQuery({ q: 'tea', utm_source: 'mail' }).ok).toBe(true);
+  });
+});
+
+describe('parseSuggestionsQuery', () => {
+  it('shares the q and category rules with search', () => {
+    expect(parseSuggestionsQuery({ q: ' pi ', category: '' })).toEqual({ ok: true, query: { q: 'pi', category: null } });
+    expect(parseSuggestionsQuery({ q: ['a', 'b'] }).ok).toBe(false);
+    expect(parseSuggestionsQuery({ category: 'cars' }).ok).toBe(false);
   });
 });
