@@ -24,8 +24,11 @@
   </div>
 {:else if enrichment.status === 'partial'}
   <div class="notice warning">
-    <p>Some live prices couldn't be loaded.</p>
-    <button type="button" onclick={onretry}>Retry</button>
+    <p>
+      <strong>Some live prices couldn't be loaded.</strong>
+      {#if enrichment.reason}{reasonText} The prices shown were fetched recently.{/if}
+    </p>
+    <button type="button" onclick={onretry}>Retry live prices</button>
   </div>
 {:else if recovered}
   <div class="notice success">
