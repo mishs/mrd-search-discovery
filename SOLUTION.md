@@ -114,8 +114,9 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 | Dev arrangement | `npm run dev`, then `curl` via the Vite proxy on :5173 | ✅ `/api/*` proxied, index served |
 | UI states | scripted headless Chromium (Playwright) against the built app | ✅ desktop and 375px mobile (no horizontal scroll); keyboard-only search; empty; provider failure → degraded banner; retry → recovered; timeout answers in ≈1.4 s; slow search keeps previous results faded and labelled; 6 rapid category changes → 5 aborted, final screen correct; server down → error + retry recovers |
 | Server-side cancellation | API log during rapid category changes | ✅ "abandoned: client disconnected, provider call aborted" |
+| Second environment | fresh clone in a Linux arm64 VM (Node v22.23.4): `npm ci`, `check`, `test`, `build`, built start + `curl` | ✅ same results (51 tests, 0 type errors, 200s) |
 
-**Not yet verified:** a manual review by a person in a real browser, screen-reader testing (VoiceOver/NVDA), Safari/Firefox, Windows, and running on Node 24.
+**Not yet verified:** a manual review by a person in a real browser, screen-reader testing (VoiceOver/NVDA), Safari/Firefox, macOS and Windows hosts, and running on Node 24.
 
 ## Limitations and next steps
 
