@@ -37,10 +37,14 @@ export function fetchCategories(signal: AbortSignal): Promise<CategoriesResponse
   return getJson<CategoriesResponse>('/api/categories', signal);
 }
 
-export function searchItems(query: SearchQuery, signal: AbortSignal): Promise<SearchResponse> {
+export function searchUrl(query: SearchQuery): string {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
   if (query.category) params.set('category', query.category);
   params.set('sort', query.sort);
-  return getJson<SearchResponse>(`/api/search?${params.toString()}`, signal);
+  return `/api/search?${params.toString()}`;
+}
+
+export function searchItems(query: SearchQuery, signal: AbortSignal): Promise<SearchResponse> {
+  return getJson<SearchResponse>(searchUrl(query), signal);
 }
