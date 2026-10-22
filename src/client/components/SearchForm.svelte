@@ -4,11 +4,10 @@
   interface Props {
     categories: Category[];
     categoriesFailed: boolean;
-    busy: boolean;
     onsearch: (query: SearchQuery) => void;
   }
 
-  let { categories, categoriesFailed, busy, onsearch }: Props = $props();
+  let { categories, categoriesFailed, onsearch }: Props = $props();
 
   // The form owns what the user is typing; the parent only hears about submitted searches.
   let q = $state('');
@@ -32,7 +31,7 @@
   }
 </script>
 
-<form role="search" onsubmit={submit} aria-busy={busy}>
+<form role="search" onsubmit={submit}>
   <div class="field query">
     <label for="search-q">Search</label>
     <input

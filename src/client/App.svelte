@@ -111,7 +111,7 @@
 </header>
 
 <main>
-  <SearchForm {categories} {categoriesFailed} busy={view.kind === 'loading'} onsearch={runSearch} />
+  <SearchForm {categories} {categoriesFailed} onsearch={runSearch} />
 
   <p class="visually-hidden" role="status" aria-live="polite">{announcement}</p>
 
