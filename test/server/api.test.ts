@@ -4,7 +4,12 @@ import type { SearchResponse } from '../../src/shared/contract.js';
 import { createApp } from '../../src/server/app.js';
 import { catalog } from '../../src/server/catalog/catalog.js';
 import { createLiveDetailsCache } from '../../src/server/enrichment/liveDetailsCache.js';
-import { baseDetailsFor, ProviderError, type LiveDetailsProvider } from '../../src/server/provider/provider.js';
+import {
+  baseDetailsFor,
+  ProviderError,
+  type LiveDetailsProvider,
+  type ProviderItemDetails,
+} from '../../src/server/provider/provider.js';
 
 /** Deterministic provider: answers instantly using the simulated price book. */
 const healthyProvider = (): LiveDetailsProvider => ({
@@ -62,6 +67,24 @@ describe('GET /api/search', () => {
     expect(body.items.length).toBeGreaterThan(0);
     expect(body.enrichment).toMatchObject({ status: 'unavailable', reason: 'provider_error' });
     expect(body.items.every((i) => i.live.status === 'unknown')).toBe(true);
+  });
+
+  it('answers 200 with unknown live details when provider entries are malformed', async () => {
+    const malformed: LiveDetailsProvider = {
+      getLiveDetails: vi.fn(async (ids: readonly string[]) => {
+        const entries: [string, unknown][] = ids.map((id, i) =>
+          i % 2 === 0 ? [id, {}] : [id, { available: true, priceCents: 8990 }],
+        );
+        return new Map(entries) as Map<string, ProviderItemDetails>;
+      }),
+    };
+    const res = await request(appWith(malformed)).get('/api/search').query({ q: 'pizza' });
+
+    expect(res.status).toBe(200);
+    const body = res.body as SearchResponse;
+    expect(body.total).toBeGreaterThan(1);
+    expect(body.enrichment.status).toBe('unavailable');
+    for (const item of body.items) expect(item.live).toEqual({ status: 'unknown', reason: 'provider_error' });
   });
 
   it('does not call the provider when nothing matches', async () => {
