@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Category, SearchQuery, SearchResponse } from '../shared/contract';
-  import { ApiError, fetchCategories, isAbortError, searchItems } from './lib/api';
+  import { ApiError, fetchCategories, isAbortError, searchItems, searchUrl } from './lib/api';
+  import { recordSearchTiming } from './lib/timing';
   import { createLatestRequest } from './lib/latest';
   import SearchForm from './components/SearchForm.svelte';
   import ResultsList from './components/ResultsList.svelte';
@@ -59,10 +60,12 @@
   async function runSearch(query: SearchQuery) {
     const ticket = latest.start();
     view = { kind: 'loading', query, previous: lastResponse };
+    const startedAt = performance.now();
 
     try {
       const data = await searchItems(query, ticket.signal);
       if (!ticket.isLatest()) return; // a newer search owns the screen now
+      recordSearchTiming(searchUrl(query), startedAt, JSON.stringify(query.q || '(all)'));
       const recovered =
         lastResponse?.enrichment.status === 'unavailable' && data.enrichment.status !== 'unavailable';
       lastResponse = data;
