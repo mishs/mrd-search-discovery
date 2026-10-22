@@ -120,6 +120,7 @@ export async function enrichItems(
   }
   const cacheHits = known.size;
   const toFetch = items.map((item) => item.id).filter((id) => !known.has(id));
+  const requested = new Set(toFetch);
 
   let failure: Exclude<UnknownReason, 'not_returned'> | undefined;
   let durationMs = 0;
@@ -129,7 +130,7 @@ export async function enrichItems(
     try {
       const fetched = await fetchWithDeadline(provider, toFetch, options.timeoutMs, options.signal);
       for (const [id, details] of fetched) {
-        if (!toFetch.includes(id)) continue; // ignore anything we didn't ask for
+        if (!requested.has(id)) continue; // ignore anything we didn't ask for
         known.set(id, details);
         if (isWellFormed(details)) options.cache?.set(id, details);
       }
