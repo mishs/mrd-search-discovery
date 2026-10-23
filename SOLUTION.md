@@ -153,7 +153,7 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 
 | Check | Command / method | Result |
 | --- | --- | --- |
-| Clean install | fresh `git clone`, `npm ci` | see final run below |
+| Clean install | fresh `git clone`, `npm ci` | ✅ locally and in every CI run |
 | Types | `npm run check` | ✅ 0 errors, 0 warnings |
 | Unit + API tests | `npm test` | ✅ 13 files, 93 tests |
 | E2E | `npm run test:e2e` (Chromium) | ✅ 6 tests, 4 consecutive green runs |
@@ -165,9 +165,13 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 | URL state (scripted Chromium) | | ✅ deep link with invalid category canonicalised without an extra history entry; Back/Back/Forward restore form and results; reload keeps state; title reflects query |
 | Server-side cancellation | API log | ✅ "abandoned: client disconnected, provider call aborted" |
 | Second environment (core build) | Linux arm64 VM, Node v22.23.4 | ✅ same results for the core commit |
-| CI | GitHub Actions on Node 22 and 24 + E2E | ⏳ runs when pushed |
+| CI | GitHub Actions on Node 22 and 24 + E2E | ✅ green on every PR head and every merge to `main`; final `main` (`ccccc48`): [run 39821278042](https://github.com/mishs/mrd-search-discovery/actions/runs/39821278042) |
 
 **Not yet verified by a person:** a manual review in a real browser, screen-reader testing (VoiceOver/NVDA), Safari/Firefox, macOS and Windows hosts.
+
+## AI assistance
+
+How AI was used, the prompts behind the work and what I verified are described in [docs/ai-usage.md](docs/ai-usage.md).
 
 ## Limitations and next steps
 
