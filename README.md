@@ -6,7 +6,9 @@ A small full-stack slice of a food-delivery search experience. Customers search 
 - **Client:** Svelte 5 (runes) + Vite 8, TypeScript, plain CSS
 - **Tests:** Vitest + Supertest
 
-> **Video walkthrough:** _VIDEO LINK TO BE ADDED BEFORE SUBMISSION_
+> **Video walkthrough:** <https://www.loom.com/share/bba17b33d75649838291bd0d1e202371>
+>
+> **Live demo:** <https://mrd-search-discovery.netlify.app/> (hosted on Netlify; see [Live demo](#live-demo-netlify) for how it differs from running locally)
 
 Design decisions and trade-offs are in [SOLUTION.md](SOLUTION.md). How AI was used is in [docs/ai-usage.md](docs/ai-usage.md).
 
@@ -54,7 +56,7 @@ Both arrangements give the browser a single origin, so CORS is never needed.
 
 ## Live demo (Netlify)
 
-> **Live demo:** _DEMO LINK TO BE ADDED AFTER DEPLOYMENT_
+> **Live demo:** <https://mrd-search-discovery.netlify.app/>
 
 The hosted demo is for trying the app without installing anything. It runs the **same Express app**; only the hosting around it differs. Locally, `npm run dev` and `npm start` work exactly as described above.
 

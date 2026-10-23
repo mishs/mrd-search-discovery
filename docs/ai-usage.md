@@ -272,7 +272,7 @@ I will add concrete changes or rejected suggestions once I have confirmed the re
 
 ## Independent review and what changed
 
-After the feature PRs were merged, I obtained an independent review of `main` at `ccccc48` and gave its findings to Claude to address. Claude's changes were merged in [PR #10](https://github.com/mishs/mrd-search-discovery/pull/10). The hosted-demo setup was merged in [PR #9](https://github.com/mishs/mrd-search-discovery/pull/9) and has not been deployed. Each finding below is recorded with what Claude changed; my own review of each change is still pending.
+After the feature PRs were merged, I obtained an independent review of `main` at `ccccc48` and gave its findings to Claude to address. Claude's changes were merged in [PR #10](https://github.com/mishs/mrd-search-discovery/pull/10). The hosted-demo setup was merged in [PR #9](https://github.com/mishs/mrd-search-discovery/pull/9), and I deployed it to Netlify at <https://mrd-search-discovery.netlify.app/>. Each finding below is recorded with what Claude changed; my own review of each change is still pending.
 
 | Finding | What changed | Status |
 | --- | --- | --- |
@@ -282,7 +282,7 @@ After the feature PRs were merged, I obtained an independent review of `main` at
 | "Live prices are back" shown when nothing proved the provider had recovered | The message appears only when a response proves the provider answered for every item. Unit tests cover unavailable → skipped, cached, partial and successful | Accepted; my review pending |
 | Metrics losing the reason for partial failures, and counting client cancellations as provider errors | Provider-call outcomes are counted apart from response completeness, and cancellation is checked first. Regressions for partial timeout, malformed entries and a real client abort | Accepted; my review pending |
 | Cached entries could expire while waiting for the provider; results on screen don't expire | Entries that could expire during the wait are fetched again, so a response is never older than the cache TTL (fake-clock test). Results on screen are documented as not expiring | Accepted; my review pending |
-| Documentation and hosted demo | README and SOLUTION reconciled with the new behaviour. Netlify setup prepared with its limitations and how to read diagnostics there; nothing deployed | Accepted; my review pending |
+| Documentation and hosted demo | README and SOLUTION reconciled with the new behaviour. Netlify setup prepared with its limitations and how to read diagnostics there. I deployed it to Netlify after merging | Accepted; my review pending |
 
 Automated results after these changes: `npm run check` clean, 123 unit and API tests in 14 files, and 10 Playwright tests (3 consecutive green local runs) in Chromium. CI passed on the PR head ([run 39875336786](https://github.com/mishs/mrd-search-discovery/actions/runs/39875336786)) and again after the merge to `main` ([run 39879856571](https://github.com/mishs/mrd-search-discovery/actions/runs/39879856571)). Several new regressions were run against the previous code first and failed there. The instrumentation is in-process diagnostics; it is not external monitoring or alerting.
 
@@ -300,14 +300,14 @@ What Claude confirmed itself (automated, not a person's review):
 - The 10 Playwright tests passed in Chromium three times in a row. The new review regressions failed against the code from before the fixes.
 - The suspected Svelte binding-order problem did not reproduce (Svelte 5.57.2, Chromium): each request carried the updated value.
 - GitHub Actions passed on Node 22 and 24 plus end-to-end for every PR head and every merge listed below.
-- For the hosted demo (PR #9), a local Netlify build packaged the function, and the packaged function answered the API routes correctly. It has not been deployed.
+- For the hosted demo (PR #9), a local Netlify build packaged the function, and the packaged function answered the API routes correctly. After I deployed it, Claude checked the live API: a search returned 6 results with live prices, and suggestions answered through the `/api/*` rewrite.
 
 Still to be confirmed by me before submission:
 
 - My manual browser review: search, filter, sort, slow or failing provider responses, recovery, mobile layout and keyboard interaction.
 - Running the documented setup and application commands on my own machine.
 - My review of the request flow, failure handling, caching, stale-response protection and the tests that cover them.
-- The public repository contents and video access. (The CI result for the final `main` commit is recorded above; I still need to check the commit I submit is that one.)
+- The public repository contents, and that the [video](https://www.loom.com/share/bba17b33d75649838291bd0d1e202371) and the [live demo](https://mrd-search-discovery.netlify.app/) open for someone who is not signed in. (The CI result for the final `main` commit is recorded above; I still need to check the commit I submit is that one.)
 
 I will update this section with what I actually checked and any remaining limitations. A configured workflow alone is not a completed CI run.
 
@@ -328,7 +328,7 @@ The work landed as one PR per feature, in the order it was built. Each was merge
 | [#7](https://github.com/mishs/mrd-search-discovery/pull/7) | SOLUTION refresh | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39819747644) | 17:17 |
 | [#8](https://github.com/mishs/mrd-search-discovery/pull/8) | This AI-usage page | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39875416022) | 00:09 (23 Oct) |
 | [#10](https://github.com/mishs/mrd-search-discovery/pull/10) | Fixes from the independent review | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39875336786) | 00:43 (23 Oct) |
-| [#9](https://github.com/mishs/mrd-search-discovery/pull/9) | Netlify demo setup (not deployed) | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39880169987) | 01:00 (23 Oct) |
+| [#9](https://github.com/mishs/mrd-search-discovery/pull/9) | Netlify demo setup (deployed by me afterwards) | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39880169987) | 01:00 (23 Oct) |
 
 PRs #1–#7 were merged on 22 Oct 2026. I merged #8, #10 and #9 myself. The push to `main` after each merge also passed CI. I remain responsible for reviewing the final result before making the submission repository public.
 
