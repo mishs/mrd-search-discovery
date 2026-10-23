@@ -4,6 +4,8 @@ A small full-stack slice of a food-delivery search experience. Customers search 
 
 **[Try the live demo](https://mrd-search-discovery.netlify.app)** · **[Watch the implementation walkthrough](https://www.loom.com/share/bba17b33d75649838291bd0d1e202371)**
 
+*To open either link in a new tab, Ctrl-click (Windows/Linux) or Cmd-click (Mac).*
+
 The walkthrough shows the app working, then the architecture, the main decisions and trade-offs, failure and recovery behaviour, verification and how AI was used. The live demo runs on Netlify; [how it differs from a local run](#live-demo-netlify).
 
 - **Server:** Node.js, Express 5, TypeScript (`strict`), zod for runtime validation
