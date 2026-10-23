@@ -23,10 +23,18 @@
   const kindLabels: Record<SuggestionKind, string> = { item: '', restaurant: 'Restaurant', category: 'Category' };
 
   let suggestions = $state<Suggestion[]>([]);
+  /** The text and category the current suggestions were loaded for. */
+  let loadedFor = $state<{ q: string; category: CategorySlug | null } | null>(null);
   let open = $state(false);
   let activeIndex = $state(-1);
+  /** A suggestion request is waiting (debounce or network). */
+  let pending = $state(false);
 
-  const expanded = $derived(open && suggestions.length > 0);
+  // Options are selectable only while they still match the box and the filter. Any
+  // change, typed or programmatic (URL restore, Back/Forward, category select),
+  // invalidates them at once, without needing a request.
+  const current = $derived(loadedFor !== null && loadedFor.q === value && loadedFor.category === category);
+  const expanded = $derived(open && current && suggestions.length > 0);
   const activeId = $derived(expanded && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined);
 
   const loader = createSuggestionLoader({
@@ -38,11 +46,28 @@
     activeIndex = -1;
   }
 
+  function cancelPending() {
+    loader.cancel();
+    pending = false;
+  }
+
+  // A pending answer for another category is no longer wanted.
+  $effect(() => {
+    void category;
+    cancelPending();
+    close();
+  });
+
   // Suggestions are requested only from real typing, never when the value is set
   // programmatically (choosing a suggestion, restoring from the URL).
   function handleInput() {
-    loader.request(value, category, (result) => {
+    const requested = { q: value, category };
+    close(); // the old options described different text
+    pending = true;
+    loader.request(requested.q, requested.category, (result) => {
+      pending = false;
       suggestions = result;
+      loadedFor = requested;
       activeIndex = -1;
       open = result.length > 0;
     });
@@ -51,12 +76,12 @@
   function choose(suggestion: Suggestion) {
     value = suggestion.label;
     close();
-    loader.cancel();
+    cancelPending();
     onselect(suggestion.label);
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    const count = suggestions.length;
+    const count = current ? suggestions.length : 0;
     switch (event.key) {
       case 'ArrowDown':
         if (count === 0) return;
@@ -76,14 +101,15 @@
           choose(active);
         } else {
           close(); // let the form submit the typed text
-          loader.cancel();
+          cancelPending();
         }
         break;
       }
       case 'Escape':
-        if (expanded) {
-          event.preventDefault(); // close the list; don't also clear the field
+        if (expanded || pending) {
+          event.preventDefault(); // dismiss the suggestions; don't also clear the field
           close();
+          cancelPending();
         }
         break;
     }
@@ -91,7 +117,7 @@
 
   function handleBlur() {
     close();
-    loader.cancel();
+    cancelPending();
   }
 
   onDestroy(() => loader.cancel());

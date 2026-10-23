@@ -46,4 +46,14 @@ describe('createLiveDetailsCache', () => {
     cache.set('a', details());
     expect(cache.size).toBe(0);
   });
+
+  it('honours minRemainingMs: only entries fresh for that much longer are returned', () => {
+    let clock = 0;
+    const cache = createLiveDetailsCache({ ttlMs: 1000, now: () => clock });
+    cache.set('a', { available: false, priceCents: 0, deliveryMinutes: { min: 0, max: 0 } });
+    clock = 600;
+    expect(cache.get('a', 300)).toBeDefined(); // expires at 1000 > 900
+    expect(cache.get('a', 400)).toBeUndefined(); // 1000 is not after 1000
+    expect(cache.get('a')).toBeDefined(); // still fresh right now, and kept
+  });
 });

@@ -22,27 +22,54 @@ export interface EnrichOptions {
   now?: () => number;
 }
 
+/**
+ * What happened to the one provider call, kept apart from how complete the
+ * response is: a search can be "partial" because of a timeout, a failure or
+ * malformed entries, and a cancelled search is not a provider error.
+ */
+export type ProviderCallOutcome = 'ok' | 'timeout' | 'provider_error' | 'aborted';
+
+export interface ProviderCallSummary {
+  outcome: ProviderCallOutcome;
+  durationMs: number;
+  /** Entries the provider returned that failed validation (shown as unknown, never cached). */
+  malformedEntries: number;
+}
+
 export interface EnrichResult {
   items: SearchResultItem[];
   enrichment: EnrichmentSummary;
+  /** Absent when the provider was not called (no matches, or everything cached). */
+  providerCall?: ProviderCallSummary;
 }
 
-/** Provider data is untrusted: only a well-formed answer may become a price. */
-function isWellFormed(details: ProviderItemDetails): boolean {
-  if (!details.available) return true;
-  const { priceCents, deliveryMinutes } = details;
-  return (
-    Number.isInteger(priceCents) &&
-    priceCents > 0 &&
-    Number.isFinite(deliveryMinutes.min) &&
-    deliveryMinutes.min >= 0 &&
-    deliveryMinutes.max >= deliveryMinutes.min
-  );
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const isMinutes = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+
+/**
+ * Provider data is untrusted. Returns a clean copy of a well-formed entry, or
+ * undefined. Only the result of this function is ever cached or converted.
+ * - `available` must be a boolean: `{}` is malformed, not "out of stock".
+ * - An available item needs a positive integer price and a finite delivery
+ *   window of whole minutes with min <= max.
+ */
+export function parseProviderEntry(raw: unknown): ProviderItemDetails | undefined {
+  if (!isRecord(raw) || typeof raw.available !== 'boolean') return undefined;
+  if (!raw.available) return { available: false, priceCents: 0, deliveryMinutes: { min: 0, max: 0 } };
+
+  const { priceCents, deliveryMinutes } = raw;
+  if (typeof priceCents !== 'number' || !Number.isSafeInteger(priceCents) || priceCents <= 0) return undefined;
+  if (!isRecord(deliveryMinutes)) return undefined;
+  const { min, max } = deliveryMinutes;
+  if (!isMinutes(min) || !isMinutes(max) || max < min) return undefined;
+  return { available: true, priceCents, deliveryMinutes: { min, max } };
 }
 
 function toLiveDetails(details: ProviderItemDetails | undefined): LiveDetails {
   if (details === undefined) return { status: 'unknown', reason: 'not_returned' };
-  if (!isWellFormed(details)) return { status: 'unknown', reason: 'provider_error' };
   if (!details.available) return { status: 'unavailable' };
   return {
     status: 'available',
@@ -97,10 +124,13 @@ async function fetchWithDeadline(
  * - No matches: the provider is not called (status "skipped").
  * - Fresh cached answers are reused; one batch call fetches only the rest, and
  *   no call is made when everything is cached.
+ * - Freshness holds when the response is built, not only at lookup: if we are
+ *   going to wait for the provider, a cached entry that could expire during
+ *   that wait (up to `timeoutMs`) is fetched again instead of reused.
  * - Bounded wait (see fetchWithDeadline).
- * - Failure or timeout never becomes a price or "out of stock": affected items
- *   are `unknown` with a reason, and the catalog results still show. Items
- *   answered from the cache keep their live details ("partial").
+ * - Failure, timeout or a malformed entry never becomes a price or "out of
+ *   stock": affected items are `unknown` with a reason, and the catalog results
+ *   still show. Items answered from the cache keep their live details ("partial").
  */
 export async function enrichItems(
   items: readonly CatalogItem[],
@@ -118,32 +148,51 @@ export async function enrichItems(
     const cached = options.cache?.get(item.id);
     if (cached) known.set(item.id, cached);
   }
+  if (options.cache && known.size < items.length) {
+    // We will wait up to timeoutMs: don't reuse an entry that could expire meanwhile.
+    for (const id of [...known.keys()]) {
+      if (!options.cache.get(id, options.timeoutMs)) known.delete(id);
+    }
+  }
   const cacheHits = known.size;
   const toFetch = items.map((item) => item.id).filter((id) => !known.has(id));
   const requested = new Set(toFetch);
+  const malformed = new Set<string>();
 
   let failure: Exclude<UnknownReason, 'not_returned'> | undefined;
   let durationMs = 0;
+  let providerCall: ProviderCallSummary | undefined;
 
   if (toFetch.length > 0) {
     const started = now();
+    let outcome: ProviderCallOutcome = 'ok';
     try {
-      const fetched = await fetchWithDeadline(provider, toFetch, options.timeoutMs, options.signal);
-      for (const [id, details] of fetched) {
-        if (!requested.has(id)) continue; // ignore anything we didn't ask for
+      const fetched: unknown = await fetchWithDeadline(provider, toFetch, options.timeoutMs, options.signal);
+      if (!(fetched instanceof Map)) throw new Error('Provider returned a malformed response');
+      for (const [id, raw] of fetched as Map<unknown, unknown>) {
+        if (typeof id !== 'string' || !requested.has(id)) continue; // ignore anything we didn't ask for
+        const details = parseProviderEntry(raw);
+        if (details === undefined) {
+          malformed.add(id);
+          continue;
+        }
         known.set(id, details);
-        if (isWellFormed(details)) options.cache?.set(id, details);
+        options.cache?.set(id, details);
       }
     } catch (error) {
       failure = error instanceof ProviderTimeoutError ? 'timeout' : 'provider_error';
+      outcome = options.signal?.aborted ? 'aborted' : failure;
     }
     durationMs = Math.round(now() - started);
+    providerCall = { outcome, durationMs, malformedEntries: malformed.size };
   }
 
   const enriched: SearchResultItem[] = items.map((item) => {
     const details = known.get(item.id);
-    if (details === undefined && failure) return { ...item, live: { status: 'unknown', reason: failure } };
-    return { ...item, live: toLiveDetails(details) };
+    if (details !== undefined) return { ...item, live: toLiveDetails(details) };
+    if (malformed.has(item.id)) return { ...item, live: { status: 'unknown', reason: 'provider_error' } };
+    if (failure) return { ...item, live: { status: 'unknown', reason: failure } };
+    return { ...item, live: toLiveDetails(undefined) };
   });
 
   const unknownCount = enriched.filter((item) => item.live.status === 'unknown').length;
@@ -155,5 +204,5 @@ export async function enrichItems(
   } else {
     enrichment = { status: 'partial', ...(failure ? { reason: failure } : {}), durationMs, cacheHits };
   }
-  return { items: enriched, enrichment };
+  return { items: enriched, enrichment, ...(providerCall ? { providerCall } : {}) };
 }

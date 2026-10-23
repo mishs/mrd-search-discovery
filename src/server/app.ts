@@ -100,15 +100,17 @@ export function createApp(deps: AppDependencies): Express {
     const matches = searchCatalog(catalog, parsed.query);
     const searchMs = performance.now() - searchStart;
 
-    const { items, enrichment } = await enrichItems(matches, provider, {
+    const { items, enrichment, providerCall } = await enrichItems(matches, provider, {
       timeoutMs: providerTimeoutMs,
       signal: disconnected.signal,
       ...(liveDetailsCache ? { cache: liveDetailsCache } : {}),
     });
 
-    metrics.recordEnrichment(enrichment, matches.length);
+    // Check cancellation first, so an abandoned search is not counted as a provider error.
+    const cancelled = disconnected.signal.aborted;
+    metrics.recordSearch({ summary: enrichment, providerCall, itemCount: matches.length, cancelled });
 
-    if (disconnected.signal.aborted) {
+    if (cancelled) {
       log(`search ${describeQuery(parsed.query)} abandoned: client disconnected, provider call aborted`);
       return;
     }
