@@ -171,7 +171,7 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 | URL state (scripted Chromium) | | ✅ deep link with invalid category canonicalised without an extra history entry; Back/Back/Forward restore form and results; reload keeps state; title reflects query |
 | Server-side cancellation | API log | ✅ "abandoned: client disconnected, provider call aborted" |
 | Second environment (core build) | Linux arm64 VM, Node v22.23.4 | ✅ same results for the core commit |
-| CI | GitHub Actions on Node 22 and 24 + E2E | ✅ green on every PR head and every merge to `main`; final `main` (`ccccc48`): [run 39821278042](https://github.com/mishs/mrd-search-discovery/actions/runs/39821278042) |
+| CI | GitHub Actions on Node 22 and 24 + E2E | ✅ green on every PR head and every merge to `main`; current `main` (`bf99fc6`, after the review fixes): [run 39879856571](https://github.com/mishs/mrd-search-discovery/actions/runs/39879856571) |
 
 **Not yet verified by a person:** a manual review in a real browser, screen-reader testing (VoiceOver/NVDA), Safari/Firefox, macOS and Windows hosts.
 
@@ -197,5 +197,6 @@ How AI was used, the prompts behind the work and what I verified are described i
 1. Progressive enrichment: return catalog results immediately and stream live details (SSE) for a faster first paint.
 2. Component tests for `SearchInput` and the result states (Vitest browser mode or Testing Library).
 3. Production hardening: helmet, rate limiting, structured logs, metrics exported to a backend, auth on diagnostics, and an OpenAPI description of the contract.
+   - **Monitoring and alerting** are out of scope here. The in-process `/api/metrics` already separates the signals a real setup would export (for example via OpenTelemetry to Prometheus or a hosted service): provider timeout and error rates, malformed-entry count, p95 search latency, cancelled searches and cache hit rate. Reasonable first alerts would be a provider error-or-timeout rate above about 5% over 5 minutes, p95 search latency above the provider timeout, and any sustained malformed entries. These thresholds are suggestions to tune against real traffic.
 4. Shared cache (Redis) with the same freshness rule if the API runs on several instances.
 5. Relevance ranking, combining text-match quality with popularity, if the catalog grows.

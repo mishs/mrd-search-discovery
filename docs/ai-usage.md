@@ -245,7 +245,7 @@ Claude's implementation handoff covered:
 - Automated tests, scripted browser checks, README.md and SOLUTION.md.
 - Following my scope expansion: instrumentation, provider-detail caching, URL-synced state, typeahead, Playwright tests and GitHub Actions configuration.
 
-Reconciled with the final repository (`main` at `ccccc48`): 93 unit and API tests in 13 files (`test/server`, `test/client`) and 6 Playwright end-to-end tests (`e2e/`). Those counts come from the final test output and the GitHub Actions runs linked below, not from an intermediate handoff.
+Reconciled with the repository (`main` at `bf99fc6`, after the review fixes): 123 unit and API tests in 14 files (`test/server`, `test/client`) and 10 Playwright end-to-end tests (`e2e/`). Before the review fixes (`ccccc48`) the counts were 93 tests in 13 files and 6 end-to-end tests. Those counts come from the final test output and the GitHub Actions runs linked below, not from an intermediate handoff.
 
 ## Decisions: accepted, changed, rejected
 
@@ -272,7 +272,7 @@ I will add concrete changes or rejected suggestions once I have confirmed the re
 
 ## Independent review and what changed
 
-After the feature PRs were merged, I obtained an independent review of `main` at `ccccc48` and gave its findings to Claude to address. Claude's changes are in [PR #10](https://github.com/mishs/mrd-search-discovery/pull/10) and the hosted-demo setup is in [PR #9](https://github.com/mishs/mrd-search-discovery/pull/9). Each finding below is recorded with what Claude changed; my own review of each change is still pending.
+After the feature PRs were merged, I obtained an independent review of `main` at `ccccc48` and gave its findings to Claude to address. Claude's changes were merged in [PR #10](https://github.com/mishs/mrd-search-discovery/pull/10). The hosted-demo setup is in [PR #9](https://github.com/mishs/mrd-search-discovery/pull/9) and has not been deployed. Each finding below is recorded with what Claude changed; my own review of each change is still pending.
 
 | Finding | What changed | Status |
 | --- | --- | --- |
@@ -284,14 +284,23 @@ After the feature PRs were merged, I obtained an independent review of `main` at
 | Cached entries could expire while waiting for the provider; results on screen don't expire | Entries that could expire during the wait are fetched again, so a response is never older than the cache TTL (fake-clock test). Results on screen are documented as not expiring | Accepted; my review pending |
 | Documentation and hosted demo | README and SOLUTION reconciled with the new behaviour. Netlify setup prepared with its limitations and how to read diagnostics there; nothing deployed | Accepted; my review pending |
 
-Automated results after these changes, on the PR #10 branch: `npm run check` clean, 123 unit and API tests in 14 files, and 10 Playwright tests (3 consecutive green runs) in Chromium. Several new regressions were run against the previous code first and failed there. The instrumentation is in-process diagnostics; it is not external monitoring or alerting.
+Automated results after these changes: `npm run check` clean, 123 unit and API tests in 14 files, and 10 Playwright tests (3 consecutive green local runs) in Chromium. CI passed on the PR head ([run 39875336786](https://github.com/mishs/mrd-search-discovery/actions/runs/39875336786)) and again after the merge to `main` ([run 39879856571](https://github.com/mishs/mrd-search-discovery/actions/runs/39879856571)). Several new regressions were run against the previous code first and failed there. The instrumentation is in-process diagnostics; it is not external monitoring or alerting.
 
 ## Verification evidence
 
 Claude's automated-check results are in [SOLUTION.md → Verification actually performed](../SOLUTION.md#verification-actually-performed). Two kinds of evidence are kept apart there:
 
 - **Local checks** run by Claude in a Linux development environment (Node 22): type check, unit/API tests, e2e, build, built start and scripted browser checks.
-- **GitHub Actions runs** on GitHub's runners: every PR and every merge to `main` ran type check, tests, build and a smoke test of the built server on Node 22 and 24, plus the Playwright job from PR #6 onwards. All of them passed. The final `main` commit `ccccc48` passed in [run 39821278042](https://github.com/mishs/mrd-search-discovery/actions/runs/39821278042).
+- **GitHub Actions runs** on GitHub's runners: every PR and every merge to `main` ran type check, tests, build and a smoke test of the built server on Node 22 and 24, plus the Playwright job from PR #6 onwards. All of them passed. The current `main` commit `bf99fc6` passed in [run 39879856571](https://github.com/mishs/mrd-search-discovery/actions/runs/39879856571).
+
+What Claude confirmed itself (automated, not a person's review):
+
+- `npm ci`, `npm run check` (0 errors, 0 warnings), `npm test` (123 tests) and `npm run build` on Node 22 in Linux.
+- The built server answered `/` and the API routes with the expected status codes (200, 400 for an invalid category, 404 for an unknown route), and `/api/metrics` showed provider outcomes separately.
+- The 10 Playwright tests passed in Chromium three times in a row. The new review regressions failed against the code from before the fixes.
+- The suspected Svelte binding-order problem did not reproduce (Svelte 5.57.2, Chromium): each request carried the updated value.
+- GitHub Actions passed on Node 22 and 24 plus end-to-end for every PR head and every merge listed below.
+- For the hosted demo (PR #9), a local Netlify build packaged the function, and the packaged function answered the API routes correctly. It has not been deployed.
 
 Still to be confirmed by me before submission:
 
@@ -317,8 +326,10 @@ The work landed as one PR per feature, in the order it was built. Each was merge
 | [#5](https://github.com/mishs/mrd-search-discovery/pull/5) | Typeahead suggestions | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39819269808) | 17:03 |
 | [#6](https://github.com/mishs/mrd-search-discovery/pull/6) | End-to-end tests in CI | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39819436260) | 17:05 |
 | [#7](https://github.com/mishs/mrd-search-discovery/pull/7) | SOLUTION refresh | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39819747644) | 17:17 |
+| [#8](https://github.com/mishs/mrd-search-discovery/pull/8) | This AI-usage page | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39875416022) | 00:09 (23 Oct) |
+| [#10](https://github.com/mishs/mrd-search-discovery/pull/10) | Fixes from the independent review | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39875336786) | 00:43 (23 Oct) |
 
-The push to `main` after each merge also passed CI. I remain responsible for reviewing the final result before making the submission repository public.
+PRs #1–#7 were merged on 22 Oct 2026. I merged #8 and #10 myself. The push to `main` after each merge also passed CI. I remain responsible for reviewing the final result before making the submission repository public.
 
 This page records the AI contribution directly. I am keeping the Git account factual.
 
