@@ -171,7 +171,7 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 | URL state (scripted Chromium) | | ✅ deep link with invalid category canonicalised without an extra history entry; Back/Back/Forward restore form and results; reload keeps state; title reflects query |
 | Server-side cancellation | API log | ✅ "abandoned: client disconnected, provider call aborted" |
 | Second environment (core build) | Linux arm64 VM, Node v22.23.4 | ✅ same results for the core commit |
-| CI | GitHub Actions on Node 22 and 24 + E2E | ✅ green on every PR head and every merge to `main`; current `main` (`2a8c53b`): [run 39881536279](https://github.com/mishs/mrd-search-discovery/actions/runs/39881536279) |
+| CI | GitHub Actions on Node 22 and 24 + E2E | ✅ green on every PR head and every merge to `main`; `main` at `25123c7`: [run 39882430520](https://github.com/mishs/mrd-search-discovery/actions/runs/39882430520) |
 
 **Not yet verified by a person:** a manual review in a real browser, screen-reader testing (VoiceOver/NVDA), Safari/Firefox, macOS and Windows hosts.
 

@@ -2,11 +2,13 @@
 
 A small full-stack slice of a food-delivery search experience. Customers search a local catalog of 36 dishes and grocery items, filter by category and sort the results. Each result is enriched with live availability, price and delivery estimate from a simulated upstream provider that is slow at times and sometimes fails.
 
+**[Try the live demo](https://mrd-search-discovery.netlify.app)** · **[Watch the implementation walkthrough](https://www.loom.com/share/bba17b33d75649838291bd0d1e202371)**
+
+The walkthrough shows the app working, then the architecture, the main decisions and trade-offs, failure and recovery behaviour, verification and how AI was used. The live demo runs on Netlify; [how it differs from a local run](#live-demo-netlify).
+
 - **Server:** Node.js, Express 5, TypeScript (`strict`), zod for runtime validation
 - **Client:** Svelte 5 (runes) + Vite 8, TypeScript, plain CSS
 - **Tests:** Vitest + Supertest
-
-> **Video walkthrough:** _VIDEO LINK TO BE ADDED BEFORE SUBMISSION_
 
 Design decisions and trade-offs are in [SOLUTION.md](SOLUTION.md). How AI was used is in [docs/ai-usage.md](docs/ai-usage.md).
 
@@ -54,7 +56,7 @@ Both arrangements give the browser a single origin, so CORS is never needed.
 
 ## Live demo (Netlify)
 
-> **Live demo:** _DEMO LINK TO BE ADDED AFTER DEPLOYMENT_
+> **Live demo:** <https://mrd-search-discovery.netlify.app>
 
 The hosted demo is for trying the app without installing anything. It runs the **same Express app**; only the hosting around it differs. Locally, `npm run dev` and `npm start` work exactly as described above.
 
@@ -69,7 +71,7 @@ browser → Netlify CDN ─┬─ /*      → dist/client (static, built by npm 
 - `src/server/bootstrap.ts` builds the app from config. The local server and the function both use it, so the catalog, provider, timeout and cache wiring are identical.
 - The provider variables in the next section apply here too. Set them under **Site configuration → Environment variables** in Netlify. With the defaults, about 1 in 10 searches shows the degraded state, which is intended.
 
-**Deploying** (one-off, from the Netlify dashboard): *Add new project (older dashboards: Add new site) → Import an existing project → GitHub*, choose this repository and keep the settings read from `netlify.toml`. The repository can stay private, but the site URL is public. From a terminal, `npx netlify-cli deploy` builds and creates a draft (preview) deploy; `--prod` publishes it.
+**Deploying.** The site is connected to this repository through Netlify's GitHub integration, so every merge to `main` deploys automatically. To deploy your own copy from the Netlify dashboard: *Add new project (older dashboards: Add new site) → Import an existing project → GitHub*, choose the repository and keep the settings read from `netlify.toml`. The site URL is public. From a terminal, `npx netlify-cli deploy` builds and creates a draft (preview) deploy; `--prod` publishes it.
 
 **Hosting limitations of the demo** (they don't apply to `npm start`):
 
