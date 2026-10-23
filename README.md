@@ -2,13 +2,13 @@
 
 A small full-stack slice of a food-delivery search experience. Customers search a local catalog of 36 dishes and grocery items, filter by category and sort the results. Each result is enriched with live availability, price and delivery estimate from a simulated upstream provider that is slow at times and sometimes fails.
 
+**[Try the live demo](https://mrd-search-discovery.netlify.app)** · **Watch the implementation walkthrough** _(link and duration added once the video is uploaded)_
+
+The walkthrough shows the app working, then the architecture, the main decisions and trade-offs, failure and recovery behaviour, verification and how AI was used. The live demo runs on Netlify; [how it differs from a local run](#live-demo-netlify).
+
 - **Server:** Node.js, Express 5, TypeScript (`strict`), zod for runtime validation
 - **Client:** Svelte 5 (runes) + Vite 8, TypeScript, plain CSS
 - **Tests:** Vitest + Supertest
-
-> **Video walkthrough:** _VIDEO LINK TO BE ADDED BEFORE SUBMISSION_
->
-> **Live demo:** <https://mrd-search-discovery.netlify.app> (hosted on Netlify; [how it differs from a local run](#live-demo-netlify))
 
 Design decisions and trade-offs are in [SOLUTION.md](SOLUTION.md). How AI was used is in [docs/ai-usage.md](docs/ai-usage.md).
 

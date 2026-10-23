@@ -245,7 +245,7 @@ Claude's implementation handoff covered:
 - Automated tests, scripted browser checks, README.md and SOLUTION.md.
 - Following my scope expansion: instrumentation, provider-detail caching, URL-synced state, typeahead, Playwright tests and GitHub Actions configuration.
 
-Reconciled with the repository (`main` at `2a8c53b`, after the review fixes and the hosted-demo setup): 125 unit and API tests in 15 files (`test/server`, `test/client`) and 10 Playwright end-to-end tests (`e2e/`). Before the review fixes (`ccccc48`) the counts were 93 tests in 13 files and 6 end-to-end tests. Those counts come from the final test output and the GitHub Actions runs linked below, not from an intermediate handoff.
+Reconciled with the repository (`main` at `25123c7`, after the review fixes, the hosted-demo setup and the final documentation update): 125 unit and API tests in 15 files (`test/server`, `test/client`) and 10 Playwright end-to-end tests (`e2e/`). Before the review fixes (`ccccc48`) the counts were 93 tests in 13 files and 6 end-to-end tests. Those counts come from the final test output and the GitHub Actions runs linked below, not from an intermediate handoff.
 
 ## Decisions: accepted, changed, rejected
 
@@ -291,7 +291,7 @@ Automated results after these changes: `npm run check` clean, 123 unit and API t
 Claude's automated-check results are in [SOLUTION.md → Verification actually performed](../SOLUTION.md#verification-actually-performed). Two kinds of evidence are kept apart there:
 
 - **Local checks** run by Claude in a Linux development environment (Node 22): type check, unit/API tests, e2e, build, built start and scripted browser checks.
-- **GitHub Actions runs** on GitHub's runners: every PR and every merge to `main` ran type check, tests, build and a smoke test of the built server on Node 22 and 24, plus the Playwright job from PR #6 onwards. All of them passed. The current `main` commit `2a8c53b` passed in [run 39881536279](https://github.com/mishs/mrd-search-discovery/actions/runs/39881536279).
+- **GitHub Actions runs** on GitHub's runners: every PR and every merge to `main` ran type check, tests, build and a smoke test of the built server on Node 22 and 24, plus the Playwright job from PR #6 onwards. All of them passed. `main` at `25123c7` (after PR #11) passed in [run 39882430520](https://github.com/mishs/mrd-search-discovery/actions/runs/39882430520).
 
 What Claude confirmed itself (automated, not a person's review):
 
@@ -329,6 +329,7 @@ The work landed as one PR per feature, in the order it was built. Each was merge
 | [#8](https://github.com/mishs/mrd-search-discovery/pull/8) | This AI-usage page | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39875416022) | 00:09 (23 Oct) |
 | [#10](https://github.com/mishs/mrd-search-discovery/pull/10) | Fixes from the independent review | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39875336786) | 00:43 (23 Oct) |
 | [#9](https://github.com/mishs/mrd-search-discovery/pull/9) | Netlify demo setup (deployed 23 Oct) | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39880169987) | 01:00 (23 Oct) |
+| [#11](https://github.com/mishs/mrd-search-discovery/pull/11) | Final verification evidence and monitoring note | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39882036313) | 01:09 (23 Oct) |
 
 PRs #1–#7 were merged on 22 Oct 2026. I merged #8, #10 and #9 myself. The push to `main` after each merge also passed CI. I remain responsible for reviewing the final result before making the submission repository public.
 
