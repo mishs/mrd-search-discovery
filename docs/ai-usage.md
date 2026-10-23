@@ -307,7 +307,7 @@ Still to be confirmed by me before submission:
 - My manual browser review: search, filter, sort, slow or failing provider responses, recovery, mobile layout and keyboard interaction.
 - Running the documented setup and application commands on my own machine.
 - My review of the request flow, failure handling, caching, stale-response protection and the tests that cover them.
-- The public repository contents and video access. (The CI result for the final `main` commit is recorded above; I still need to check the commit I submit is that one.)
+- The public repository contents, and that the [walkthrough video](https://www.loom.com/share/bba17b33d75649838291bd0d1e202371) and the [live demo](https://mrd-search-discovery.netlify.app) open for someone who is not signed in. (The CI result for the final `main` commit is recorded above; I still need to check the commit I submit is that one.)
 
 I will update this section with what I actually checked and any remaining limitations. A configured workflow alone is not a completed CI run.
 
@@ -331,7 +331,7 @@ The work landed as one PR per feature, in the order it was built. Each was merge
 | [#9](https://github.com/mishs/mrd-search-discovery/pull/9) | Netlify demo setup (deployed 23 Oct) | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39880169987) | 01:00 (23 Oct) |
 | [#11](https://github.com/mishs/mrd-search-discovery/pull/11) | Final verification evidence and monitoring note | [✅](https://github.com/mishs/mrd-search-discovery/actions/runs/39882036313) | 01:09 (23 Oct) |
 
-PRs #1–#7 were merged on 22 Oct 2026. I merged #8, #10 and #9 myself. The push to `main` after each merge also passed CI. I remain responsible for reviewing the final result before making the submission repository public.
+PRs #1–#7 were merged on 22 Oct 2026. I merged #8, #10, #9 and #11 myself. The push to `main` after each merge also passed CI. I remain responsible for reviewing the final result before making the submission repository public.
 
 This page records the AI contribution directly. I am keeping the Git account factual.
 
