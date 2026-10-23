@@ -185,6 +185,7 @@ How AI was used, the prompts behind the work and what I verified are described i
 - The catalog is static and in memory, sorted but not relevance-scored, with no pagination.
 - Metrics and the cache are per process and reset on restart. Concurrent searches that miss the cache for the same items each call the provider (no request coalescing).
 - There are no isolated component tests (UI behaviour is covered end to end).
+- The hosted Netlify demo runs the same Express app as a function, so its cache and metrics are per instance and reset on cold starts, and a browser abort does not cancel the provider wait server-side. The local server keeps the full behaviour. Details in [README → Live demo](README.md#live-demo-netlify).
 - The client doesn't validate response shapes at runtime.
 - There is no rate limiting or security headers, and `/api/metrics` is unauthenticated.
 - Live-region announcements don't repeat when the text is identical.

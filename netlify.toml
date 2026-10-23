@@ -1,0 +1,18 @@
+# Live demo on Netlify. The local Express server (`npm run dev`, `npm start`) is unchanged;
+# here the same app runs as a function and Netlify serves the built client.
+[build]
+  command = "npm run build"
+  publish = "dist/client"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["express", "serverless-http"]
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
