@@ -5,6 +5,7 @@
   import { recordSearchTiming } from './lib/timing';
   import { createLatestRequest } from './lib/latest';
   import { queryFromUrl, urlFromQuery } from './lib/urlState';
+  import { nextRecovery, type RecoveryState } from './lib/recovery';
   import SearchForm from './components/SearchForm.svelte';
   import ResultsList from './components/ResultsList.svelte';
   import EnrichmentNotice from './components/EnrichmentNotice.svelte';
@@ -44,6 +45,7 @@
   // Not reactive on purpose: bookkeeping that the template never reads.
   const latest = createLatestRequest();
   let lastResponse: SearchResponse | null = null;
+  let recovery: RecoveryState = { knownDown: false };
 
   // A plain function is enough: Svelte tracks the $state it reads when the template calls it.
   function categoryLabel(slug: string): string {
@@ -113,8 +115,8 @@
       const data = await searchItems(query, ticket.signal);
       if (!ticket.isLatest()) return; // a newer search owns the screen now
       recordSearchTiming(searchUrl(query), startedAt, JSON.stringify(query.q || '(all)'));
-      const recovered =
-        lastResponse?.enrichment.status === 'unavailable' && data.enrichment.status !== 'unavailable';
+      const { recovered, ...nextState } = nextRecovery(recovery, data);
+      recovery = nextState;
       lastResponse = data;
       view = { kind: 'success', data, recovered };
     } catch (error) {

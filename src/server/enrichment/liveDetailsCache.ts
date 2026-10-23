@@ -4,8 +4,11 @@ import type { ProviderItemDetails } from '../provider/provider.js';
  * Short-lived cache of provider answers, keyed by item id.
  *
  * Freshness policy (the reason this is safe to cache at all):
- * - An entry is served for at most `ttlMs` after the provider returned it, so a
- *   price or availability shown to a customer is never older than the TTL.
+ * - An entry is served for at most `ttlMs` after the provider returned it.
+ *   Callers that wait before responding pass `minRemainingMs` (enrich.ts passes
+ *   the provider timeout), so the entry is still fresh when the response is sent.
+ *   This bounds the age of data in an API response; the client keeps showing a
+ *   response until the next search and does not expire it on screen.
  * - Only real provider answers are cached ("available" and "unavailable").
  *   Failures, timeouts and malformed entries are never cached, so an outage
  *   is not remembered after the provider recovers.
@@ -15,8 +18,8 @@ import type { ProviderItemDetails } from '../provider/provider.js';
  * need a shared cache (e.g. Redis) or accept per-instance hit rates.
  */
 export interface LiveDetailsCache {
-  /** Returns the entry only if it is still fresh. */
-  get(id: string): ProviderItemDetails | undefined;
+  /** Returns the entry only if it is fresh now and for at least `minRemainingMs` more (default 0). */
+  get(id: string, minRemainingMs?: number): ProviderItemDetails | undefined;
   set(id: string, details: ProviderItemDetails): void;
   readonly size: number;
 }
@@ -32,14 +35,15 @@ export function createLiveDetailsCache(options: LiveDetailsCacheOptions): LiveDe
   const entries = new Map<string, { details: ProviderItemDetails; expiresAt: number }>();
 
   return {
-    get(id) {
+    get(id, minRemainingMs = 0) {
       const entry = entries.get(id);
       if (!entry) return undefined;
-      if (now() >= entry.expiresAt) {
+      const at = now();
+      if (at >= entry.expiresAt) {
         entries.delete(id);
         return undefined;
       }
-      return entry.details;
+      return at + minRemainingMs < entry.expiresAt ? entry.details : undefined;
     },
 
     set(id, details) {

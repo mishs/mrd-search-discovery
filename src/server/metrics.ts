@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express';
 import type { EnrichmentSummary } from '../shared/contract.js';
+import type { ProviderCallSummary } from './enrichment/enrich.js';
 
 /**
  * Lightweight, in-process instrumentation: request counts, latency summaries
@@ -29,12 +30,17 @@ export interface MetricsSnapshot {
   startedAt: string;
   uptimeSeconds: number;
   requests: Record<string, RouteMetrics>;
-  enrichment: {
-    complete: number;
-    partial: number;
-    unavailable: { timeout: number; provider_error: number };
-    skipped: number;
-    providerLatencyMs: LatencySummary;
+  /** How complete answered searches were (what the customer saw). */
+  enrichment: { complete: number; partial: number; unavailable: number; skipped: number };
+  /** Searches abandoned because the client went away; not counted above. */
+  cancelledSearches: number;
+  /** What happened to provider calls, independent of response completeness. */
+  provider: {
+    calls: { ok: number; timeout: number; provider_error: number; aborted: number };
+    /** Returned entries that failed validation and were shown as unknown. */
+    malformedEntries: number;
+    /** Calls that ran to an outcome (aborted calls excluded). */
+    latencyMs: LatencySummary;
   };
   /** Live-details cache effectiveness: items answered from cache vs fetched. */
   cache: { hits: number; misses: number; hitRate: number };
@@ -69,11 +75,20 @@ class SampleWindow {
 
 export interface Metrics {
   recordRequest(route: string, status: number | 'aborted', durationMs: number): void;
-  /** `itemCount` is the number of items that needed live details. */
-  recordEnrichment(summary: EnrichmentSummary, itemCount: number): void;
+  recordSearch(search: SearchRecord): void;
   snapshot(): MetricsSnapshot;
   /** Express middleware that times every request it sees. */
   middleware: RequestHandler;
+}
+
+export interface SearchRecord {
+  summary: EnrichmentSummary;
+  /** Absent when the provider was not called. */
+  providerCall?: ProviderCallSummary | undefined;
+  /** Number of items that needed live details. */
+  itemCount: number;
+  /** The client disconnected before the response was sent. */
+  cancelled: boolean;
 }
 
 export function createMetrics(options: { now?: () => number; windowSize?: number } = {}): Metrics {
@@ -83,7 +98,10 @@ export function createMetrics(options: { now?: () => number; windowSize?: number
   const startedAt = now();
 
   const routes = new Map<string, { count: number; byStatus: Record<string, number>; latency: SampleWindow }>();
-  const enrichment = { complete: 0, partial: 0, unavailable: { timeout: 0, provider_error: 0 }, skipped: 0 };
+  const enrichment = { complete: 0, partial: 0, unavailable: 0, skipped: 0 };
+  let cancelledSearches = 0;
+  const providerCalls = { ok: 0, timeout: 0, provider_error: 0, aborted: 0 };
+  let malformedEntries = 0;
   const providerLatency = new SampleWindow(windowSize);
   const cache = { hits: 0, misses: 0 };
 
@@ -100,16 +118,16 @@ export function createMetrics(options: { now?: () => number; windowSize?: number
       entry.latency.add(durationMs);
     },
 
-    recordEnrichment(summary, itemCount) {
+    recordSearch({ summary, providerCall, itemCount, cancelled }) {
       cache.hits += summary.cacheHits;
       cache.misses += itemCount - summary.cacheHits;
-      if (summary.status === 'unavailable') {
-        enrichment.unavailable[summary.reason ?? 'provider_error']++;
-      } else {
-        enrichment[summary.status]++;
+      if (cancelled) cancelledSearches++;
+      else enrichment[summary.status]++;
+      if (providerCall) {
+        providerCalls[providerCall.outcome]++;
+        malformedEntries += providerCall.malformedEntries;
+        if (providerCall.outcome !== 'aborted') providerLatency.add(providerCall.durationMs);
       }
-      // Only count searches that actually waited on the provider.
-      if (summary.status !== 'skipped' && summary.cacheHits < itemCount) providerLatency.add(summary.durationMs);
     },
 
     snapshot() {
@@ -122,10 +140,12 @@ export function createMetrics(options: { now?: () => number; windowSize?: number
             { count: entry.count, byStatus: { ...entry.byStatus }, latencyMs: entry.latency.summary() },
           ]),
         ),
-        enrichment: {
-          ...enrichment,
-          unavailable: { ...enrichment.unavailable },
-          providerLatencyMs: providerLatency.summary(),
+        enrichment: { ...enrichment },
+        cancelledSearches,
+        provider: {
+          calls: { ...providerCalls },
+          malformedEntries,
+          latencyMs: providerLatency.summary(),
         },
         cache: {
           ...cache,

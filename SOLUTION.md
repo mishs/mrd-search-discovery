@@ -91,8 +91,8 @@ The core flow was built and verified first. The four optional stretch goals were
 - **Context.** "Small caching to improve responsiveness" applies to data with very different freshness needs: live prices can change, while the catalog only changes on deploy.
 - **Decision.**
   - **Server-side, live details:** a per-item TTL cache (`LIVE_DETAILS_CACHE_TTL_MS`, default 30 s, `0` disables it).
-    - A served answer is never older than the TTL.
-    - Only well-formed provider answers are cached; failures and timeouts never are, so an outage isn't remembered.
+    - Data in a response is never older than the TTL: when a search will wait for the provider, entries that could expire during that wait are fetched again. Results on screen don't expire; they stay until the next search.
+    - Only provider entries that pass validation are cached; failures, timeouts and malformed entries never are, so an outage isn't remembered.
     - Misses are fetched in one batch, and no call is made when everything is cached.
     - At most 1000 entries, oldest evicted first.
   - **Typeahead requests:**
@@ -120,10 +120,14 @@ The core flow was built and verified first. The four optional stretch goals were
   - On load, the URL is read leniently and rewritten to its canonical form with `replaceState`.
   - Each user search adds one history entry with `pushState`.
   - `<svelte:window onpopstate>` restores the form and re-runs the search without pushing again. Retries never touch history.
+- **Provider entries** (`enrichment/enrich.ts`): the provider is a trust boundary. `parseProviderEntry` validates each entry and returns a clean copy before anything converts or caches it. `{}`, a non-boolean `available`, a missing or non-finite delivery window, or a non-integer price becomes `unknown`; never out of stock, never an exception that fails the search.
 - **Typeahead UI** (`components/SearchInput.svelte`): the WAI-ARIA combobox pattern with `aria-activedescendant`. Focus stays in the input. ↑/↓ highlight an option, Enter picks it, and Esc closes the list without clearing the text. Option `mousedown` is prevented so a click doesn't blur the input first. Suggestions are requested only from real typing, never from programmatic changes, and the number of suggestions is announced.
+  - Options remember the text and category they were loaded for and are selectable only while both still match, so any change (typed, URL restore, Back/Forward, category select) invalidates them at once without a request. Escape and category changes also cancel a pending request, so a late answer can't reopen the list.
+- **Recovery message** (`client/lib/recovery.ts`): "Live prices are back" appears only when the provider was last known to be down and a response proves it answered for every item. Searches with no matches or answered entirely from the cache prove nothing, so they neither announce a recovery nor forget the outage.
 - **Stale results**: during loading, the previous results stay visible but faded, `aria-busy`, and labelled "Showing previous results while updating…". On error they are cleared.
 - **Instrumentation**:
-  - `metrics.ts` counts requests per route pattern and status (including client aborts) and records latency avg/p50/p95/max over a bounded window, enrichment outcomes by reason, and cache hit rate. They are served at `/api/metrics`.
+  - `metrics.ts` counts requests per route pattern and status (including client aborts) and records latency avg/p50/p95/max over a bounded window, response completeness, cancelled searches, provider-call outcomes with malformed-entry counts, and cache hit rate. They are served at `/api/metrics`. Cancellation is checked before recording, so an abandoned search is not counted as a provider error.
+  - This is in-process diagnostics, not monitoring or alerting.
   - Each search logs one line, and `Server-Timing` reports `search`, `provider` and `cache`.
   - In the browser, each search adds a `search` performance measure; in dev mode, a console line also splits out server and provider time.
 - **Effects**: `onMount` (initial search and categories, with abort on unmount) and `onDestroy` (cancel pending suggestions). Nothing user-triggered runs through `$effect`.
@@ -137,13 +141,15 @@ Behaviour is tested at the boundaries where bugs would hurt customers:
 | Search/filter/sort | `test/server/search.test.ts` | name, category, restaurant and tag matching; case, whitespace and accents; multi-word AND; empty query; no results; filter; stable tie-break regardless of input order; name sort; no mutation |
 | Suggestions | `test/server/suggest.test.ts` | word-prefix matching; accents; multi-word; ranking; category scope; cap; **every suggestion returns results** (property test) |
 | Input validation | `test/server/query.test.ts` | defaults, trimming, unknown values, repeated params, over-long query, shared rules for suggestions |
-| Enrichment | `test/server/enrich.test.ts` | available/unavailable; one batch call; skip on no matches; failure → unknown (never R0 or out of stock); timeout when the provider ignores abort; no timers left; partial; malformed price; disconnect aborts the provider; **cache:** misses-only fetch, no call when all cached, `unavailable` cached but malformed not, failure keeps cached items (`partial`) and caches nothing |
-| Cache | `test/server/liveDetailsCache.test.ts` | TTL expiry with an injected clock, refresh on write, eviction, disabled at TTL 0 |
-| Metrics | `test/server/metrics.test.ts` | counts by route and status incl. aborted, percentile maths, bounded window, outcomes by reason, cache hit rate, `/api/metrics` through Express |
+| Enrichment | `test/server/enrich.test.ts` | available/unavailable; one batch call; skip on no matches; failure → unknown (never R0 or out of stock); timeout when the provider ignores abort; no timers left; partial; **untrusted entries:** `{}`, non-boolean `available`, infinite or missing delivery window, fractional price, negative or inverted window, `null`, non-Map response → unknown and never cached, extra fields dropped; provider-call outcome (timeout behind a partial response, aborted); disconnect aborts the provider; **cache:** misses-only fetch, no call when all cached, `unavailable` cached but malformed not, failure keeps cached items (`partial`) and caches nothing, entries that could expire during the wait are re-fetched (fake clock) |
+| Cache | `test/server/liveDetailsCache.test.ts` | TTL expiry with an injected clock, refresh on write, eviction, disabled at TTL 0, `minRemainingMs` |
+| Metrics | `test/server/metrics.test.ts` | counts by route and status incl. aborted, percentile maths, bounded window, completeness kept apart from provider outcomes, partial timeout and partial failure keep their reason, malformed-entry count, a real client abort recorded as cancelled (not a provider error), cache hit rate, `/api/metrics` through Express |
 | Provider | `test/server/provider.test.ts` | latency range (fake timers), failure roll, stable integer prices, seed repeatability, abortable delay |
-| HTTP API | `test/server/api.test.ts` | happy path, filter + sort, 400s, degraded 200, no provider call on zero matches, cache reuse across requests, suggestions endpoint, JSON 404 |
-| Client logic | `test/client/*.test.ts` | latest-request guard; suggestion loader (one request per pause in typing, min length, memo, per-category keys, abort and late answer ignored, cancel, failure); URL parse/serialise round trip; Server-Timing parsing; price formatting |
+| HTTP API | `test/server/api.test.ts` | happy path, filter + sort, 400s, degraded 200, malformed provider entries still answer 200 with unknown details, no provider call on zero matches, cache reuse across requests, suggestions endpoint, JSON 404 |
+| Client logic | `test/client/*.test.ts` | latest-request guard; recovery message (unavailable → skipped, cached, partial, successful provider call); suggestion loader (one request per pause in typing, min length, memo, per-category keys, abort and late answer ignored, cancel, failure); URL parse/serialise round trip; Server-Timing parsing; price formatting |
 | Browser (E2E) | `e2e/search.spec.ts` | built app against three servers (healthy, failing, slow): search/filter with prices, deep link + Back/Forward, keyboard typeahead, failure shows no price, last filter wins under latency, 375 px overflow |
+| Typeahead lifecycle (E2E) | `e2e/suggestions-lifecycle.spec.ts` | with delayed suggestion responses: Enter after the query changes searches the typed text, not an old highlighted option; Escape during a pending request keeps the list closed; old options can't be reopened after a category change |
+| Binding order (E2E) | `e2e/binding-order.spec.ts` | the exact request sent after typing two characters, paste, clear, category change and sort change, to check that handlers read the updated bound values |
 
 Randomness and time are always injected, so no unit test is flaky; the E2E suite was run repeatedly with consistent results. To check that the tests catch real bugs, these were each broken on purpose during development: the sort tie-break, the enrichment timer cleanup, the "never cache malformed answers" rule and the cache TTL expiry. Each change made a test fail.
 
@@ -153,10 +159,10 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 
 | Check | Command / method | Result |
 | --- | --- | --- |
-| Clean install | fresh `git clone`, `npm ci` | see final run below |
+| Clean install | fresh `git clone`, `npm ci` | ✅ locally and in every CI run |
 | Types | `npm run check` | ✅ 0 errors, 0 warnings |
-| Unit + API tests | `npm test` | ✅ 13 files, 93 tests |
-| E2E | `npm run test:e2e` (Chromium) | ✅ 6 tests, 4 consecutive green runs |
+| Unit + API tests | `npm test` | ✅ 14 files, 123 tests (after the independent-review fixes) |
+| E2E | `npm run test:e2e` (Chromium) | ✅ 10 tests, 3 consecutive green runs after the review fixes (6 tests, 4 runs before) |
 | Build | `npm run build` | ✅ client ≈ 55 kB JS (≈ 21 kB gzip), 5 kB CSS |
 | Built start | `npm start`, `curl` `/`, `/api/*` | ✅ client and API from one origin |
 | Dev arrangement | `npm run dev` via the Vite proxy | ✅ `/api/*` proxied; dev timing log visible in console |
@@ -165,9 +171,13 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 | URL state (scripted Chromium) | | ✅ deep link with invalid category canonicalised without an extra history entry; Back/Back/Forward restore form and results; reload keeps state; title reflects query |
 | Server-side cancellation | API log | ✅ "abandoned: client disconnected, provider call aborted" |
 | Second environment (core build) | Linux arm64 VM, Node v22.23.4 | ✅ same results for the core commit |
-| CI | GitHub Actions on Node 22 and 24 + E2E | ⏳ runs when pushed |
+| CI | GitHub Actions on Node 22 and 24 + E2E | ✅ green on every PR head and every merge to `main`; final `main` (`ccccc48`): [run 39821278042](https://github.com/mishs/mrd-search-discovery/actions/runs/39821278042) |
 
 **Not yet verified by a person:** a manual review in a real browser, screen-reader testing (VoiceOver/NVDA), Safari/Firefox, macOS and Windows hosts.
+
+## AI assistance
+
+How AI was used, the prompts behind the work and what I verified are described in [docs/ai-usage.md](docs/ai-usage.md).
 
 ## Limitations and next steps
 
@@ -180,6 +190,8 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 - There is no rate limiting or security headers, and `/api/metrics` is unauthenticated.
 - Live-region announcements don't repeat when the text is identical.
 - A category suggestion runs a text search rather than setting the category filter.
+- Results on screen don't expire. Cache freshness is guaranteed for the API response, not for a page left open.
+- Browser checks run in Chromium only.
 
 **Next steps, in priority order:**
 

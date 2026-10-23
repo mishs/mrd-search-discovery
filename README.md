@@ -8,7 +8,7 @@ A small full-stack slice of a food-delivery search experience. Customers search 
 
 > **Video walkthrough:** _VIDEO LINK TO BE ADDED BEFORE SUBMISSION_
 
-Design decisions and trade-offs are in [SOLUTION.md](SOLUTION.md).
+Design decisions and trade-offs are in [SOLUTION.md](SOLUTION.md). How AI was used is in [docs/ai-usage.md](docs/ai-usage.md).
 
 ## Prerequisites
 
@@ -134,9 +134,10 @@ http://localhost:3000/?q=peri+peri&category=pizza&sort=name
 
 Provider answers are cached on the server for `LIVE_DETAILS_CACHE_TTL_MS` (30 s by default):
 
-- **Freshness:** a cached price, availability or delivery estimate is never older than the TTL.
-- **What is cached:** well-formed provider answers, both `available` and `unavailable`, per item id.
-- **What is never cached:** failures, timeouts and malformed entries, so an outage isn't remembered after the provider recovers.
+- **Freshness:** live details in an API response are never older than the TTL. Entries are checked when looked up, and when a search will wait for the provider, an entry that could expire within that wait (`PROVIDER_TIMEOUT_MS`) is fetched again instead of reused.
+- **On screen:** the browser doesn't expire results. A response stays visible until the next search, so a price on screen can be older than the TTL if the page is left open.
+- **What is cached:** provider answers that pass validation, both `available` and `unavailable`, per item id. An entry needs a boolean `available`; an available one also needs a positive integer price in cents and a delivery window of whole minutes with `min <= max`.
+- **What is never cached:** failures, timeouts and malformed entries (for example `{}` or an infinite delivery time), so an outage isn't remembered after the provider recovers. Malformed entries are shown as "unknown", never as out of stock, and never fail the search.
 - **Effect:** a repeated or overlapping search only asks the provider for items it doesn't have fresh answers for, and makes no provider call at all when everything is cached (`enrichment.durationMs` is `0`).
 - **Bounded:** at most 1000 entries, oldest evicted first. In-memory and per server instance.
 - **Partial results:** if the provider fails while some items were cached, those items keep their live details and the response says `partial` with the failure reason.
@@ -150,7 +151,7 @@ The client deliberately does **not** cache search responses: the server owns the
 | Where | What you see |
 | --- | --- |
 | **API terminal** | One log line per search: query, result count, enrichment outcome, provider wait. Abandoned (client-aborted) searches are logged too. |
-| **`GET /api/metrics`** | Request counts per route and status (including `aborted`), latency avg/p50/p95/max over the last 500 requests per route, enrichment outcomes by status and failure reason, and cache hit rate. Open <http://localhost:3000/api/metrics> in a browser (it pretty-prints JSON), or `curl -s localhost:3000/api/metrics`. In dev the same path works through Vite on :5173. |
+| **`GET /api/metrics`** | Request counts per route and status (including `aborted`), latency avg/p50/p95/max over the last 500 requests per route, how complete answered searches were, cancelled searches, provider-call outcomes (`ok`, `timeout`, `provider_error`, `aborted`) with malformed-entry count and latency, and cache hit rate. Open <http://localhost:3000/api/metrics> in a browser (it pretty-prints JSON), or `curl -s localhost:3000/api/metrics`. In dev the same path works through Vite on :5173. |
 | **DevTools → Network → (search request) → Timing** | `Server-Timing` breakdown: `search` (catalog filter/sort), `provider` (time spent waiting for live details) and `cache` (hits out of matches). |
 | **DevTools → Performance → Timings** | A `search` measure per completed search, end to end as the user experienced it. |
 | **DevTools console** (`npm run dev` only) | `[search] "pizza": 422ms total (search 0ms, provider 414ms)` |
@@ -172,13 +173,17 @@ Example `/api/metrics` (abridged):
     "GET /api/search": { "count": 12, "byStatus": { "200": 10, "400": 1, "aborted": 1 },
                          "latencyMs": { "samples": 12, "avg": 480.1, "p50": 412.3, "p95": 1004.2, "max": 1010.9 } }
   },
-  "enrichment": { "complete": 8, "partial": 0, "unavailable": { "timeout": 1, "provider_error": 1 }, "skipped": 1,
-                  "providerLatencyMs": { "samples": 10, "avg": 512.4, "p50": 498, "p95": 1001.2, "max": 1001.2 } },
+  "enrichment": { "complete": 8, "partial": 1, "unavailable": 1, "skipped": 1 },
+  "cancelledSearches": 1,
+  "provider": { "calls": { "ok": 8, "timeout": 1, "provider_error": 1, "aborted": 1 }, "malformedEntries": 0,
+                "latencyMs": { "samples": 10, "avg": 512.4, "p50": 498, "p95": 1001.2, "max": 1001.2 } },
   "cache": { "hits": 30, "misses": 66, "hitRate": 0.31 }
 }
 ```
 
-The metrics endpoint is unauthenticated because this is a local exercise; in production it would be internal-only or replaced by a metrics backend.
+`enrichment` describes what the customer got; `provider` describes what happened to the provider call. They are counted separately because a `partial` response can come from a timeout, a failure or malformed entries, and a search the client abandoned is counted as cancelled rather than as a provider error.
+
+This is in-process diagnostics for development and review, not external monitoring or alerting: numbers live in memory, reset on restart and trigger nothing. The metrics endpoint is unauthenticated because this is a local exercise; in production it would be internal-only or replaced by a metrics backend with alerts.
 
 ## API
 
