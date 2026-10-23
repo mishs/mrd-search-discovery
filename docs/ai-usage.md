@@ -270,6 +270,22 @@ These are the main choices I asked for or received for review, together with the
 
 I will add concrete changes or rejected suggestions once I have confirmed the relevant review decisions. The guarantee that a suggestion returns results under the active category filter is covered by an automated test; I have not yet confirmed it by hand.
 
+## Independent review and what changed
+
+After the feature PRs were merged, I obtained an independent review of `main` at `ccccc48` and gave its findings to Claude to address. Claude's changes are in [PR #10](https://github.com/mishs/mrd-search-discovery/pull/10) and the hosted-demo setup is in [PR #9](https://github.com/mishs/mrd-search-discovery/pull/9). Each finding below is recorded with what Claude changed; my own review of each change is still pending.
+
+| Finding | What changed | Status |
+| --- | --- | --- |
+| Malformed provider entries: `{}` treated as out of stock and cached, an infinite delivery time accepted, an entry without a delivery window crashing the search | Each entry is validated before it is converted or cached. Malformed entries show as unknown, are never cached and don't fail the search. Unit and API regressions added | Accepted; my review pending |
+| Old typeahead options selectable after the query changed; Escape not cancelling a pending request; old options reopening after a category change | Options are selectable only while they match the current text and category. Escape and category changes cancel pending requests. Three browser regressions with delayed responses | Accepted; my review pending |
+| Possible Svelte binding/event ordering problem in `oninput` and `onchange` | Investigated before changing anything. A browser check records the exact request after typing, paste, clear, category and sort changes, and each carried the updated value. Not reproduced on Svelte 5.57.2 in Chromium, so no code change | Not confirmed; my review pending |
+| "Live prices are back" shown when nothing proved the provider had recovered | The message appears only when a response proves the provider answered for every item. Unit tests cover unavailable → skipped, cached, partial and successful | Accepted; my review pending |
+| Metrics losing the reason for partial failures, and counting client cancellations as provider errors | Provider-call outcomes are counted apart from response completeness, and cancellation is checked first. Regressions for partial timeout, malformed entries and a real client abort | Accepted; my review pending |
+| Cached entries could expire while waiting for the provider; results on screen don't expire | Entries that could expire during the wait are fetched again, so a response is never older than the cache TTL (fake-clock test). Results on screen are documented as not expiring | Accepted; my review pending |
+| Documentation and hosted demo | README and SOLUTION reconciled with the new behaviour. Netlify setup prepared with its limitations and how to read diagnostics there; nothing deployed | Accepted; my review pending |
+
+Automated results after these changes, on the PR #10 branch: `npm run check` clean, 123 unit and API tests in 14 files, and 10 Playwright tests (3 consecutive green runs) in Chromium. Several new regressions were run against the previous code first and failed there. The instrumentation is in-process diagnostics; it is not external monitoring or alerting.
+
 ## Verification evidence
 
 Claude's automated-check results are in [SOLUTION.md → Verification actually performed](../SOLUTION.md#verification-actually-performed). Two kinds of evidence are kept apart there:
