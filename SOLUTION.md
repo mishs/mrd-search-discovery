@@ -161,7 +161,7 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 | --- | --- | --- |
 | Clean install | fresh `git clone`, `npm ci` | ✅ locally and in every CI run |
 | Types | `npm run check` | ✅ 0 errors, 0 warnings |
-| Unit + API tests | `npm test` | ✅ 14 files, 123 tests (after the independent-review fixes) |
+| Unit + API tests | `npm test` | ✅ 15 files, 125 tests (after the independent-review fixes and the demo function) |
 | E2E | `npm run test:e2e` (Chromium) | ✅ 10 tests, 3 consecutive green runs after the review fixes (6 tests, 4 runs before) |
 | Build | `npm run build` | ✅ client ≈ 55 kB JS (≈ 21 kB gzip), 5 kB CSS |
 | Built start | `npm start`, `curl` `/`, `/api/*` | ✅ client and API from one origin |
@@ -171,7 +171,7 @@ Run in a Linux development environment (Node v22.22.0, npm 10.9.4) on 22 Oct 202
 | URL state (scripted Chromium) | | ✅ deep link with invalid category canonicalised without an extra history entry; Back/Back/Forward restore form and results; reload keeps state; title reflects query |
 | Server-side cancellation | API log | ✅ "abandoned: client disconnected, provider call aborted" |
 | Second environment (core build) | Linux arm64 VM, Node v22.23.4 | ✅ same results for the core commit |
-| CI | GitHub Actions on Node 22 and 24 + E2E | ✅ green on every PR head and every merge to `main`; current `main` (`bf99fc6`, after the review fixes): [run 39879856571](https://github.com/mishs/mrd-search-discovery/actions/runs/39879856571) |
+| CI | GitHub Actions on Node 22 and 24 + E2E | ✅ green on every PR head and every merge to `main`; current `main` (`2a8c53b`): [run 39881536279](https://github.com/mishs/mrd-search-discovery/actions/runs/39881536279) |
 
 **Not yet verified by a person:** a manual review in a real browser, screen-reader testing (VoiceOver/NVDA), Safari/Firefox, macOS and Windows hosts.
 
